@@ -185,7 +185,7 @@ impl Interpreter {
         let mut parser = Parser::new(tokens.clone());
         match parser.parse()? {
             Some(stmts) => {
-                println!("Parsing Successful: {:?}", stmts);
+                // println!("Parsing Successful: {:?}", stmts);
                 match self.interpret(stmts) {
                     Ok(_) => {}
                     Err(err) => println!("Runtime Error: {:?}", err),

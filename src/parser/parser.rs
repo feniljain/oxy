@@ -91,15 +91,12 @@ impl Parser {
     // - Error is returned meaning there is some critical error
     pub fn parse(&mut self) -> Result<Option<Vec<Stmt>>, RoxyError> {
         let mut stmts: Vec<Stmt> = vec![];
-        // println!("Here: {:?}", self.is_at_end());
         while !self.is_at_end() {
-            // println!("{:?}", self.is_at_end());
             match self.statement() {
                 Ok(stmt) => {
                     stmts.push(stmt);
                 }
                 Err(err) => {
-                    // println!("ParserErr: {:?}", err);
                     match err {
                         RoxyError::ParserError(ref parser_error) => match parser_error {
                             ParserError::InvalidPeek => return Err(err),
@@ -176,7 +173,7 @@ impl Parser {
 
         loop {
             let (visited_token, matched) = self.does_any_token_type_match(&token_types)?;
-            if matched {
+            if !matched {
                 break;
             }
 
@@ -212,14 +209,15 @@ impl Parser {
     }
 
     pub fn equality(&mut self) -> Result<(Token, Expr), RoxyError> {
-        self.left_recursive_parsing(
+        let expr = self.left_recursive_parsing(
             &vec![TokenType::BangEqual, TokenType::EqualEqual],
             Parser::comparison,
-        )
+        )?;
+        return Ok(expr);
     }
 
     pub fn comparison(&mut self) -> Result<(Token, Expr), RoxyError> {
-        self.left_recursive_parsing(
+        let expr = self.left_recursive_parsing(
             &vec![
                 TokenType::Greater,
                 TokenType::GreaterEqual,
@@ -227,15 +225,20 @@ impl Parser {
                 TokenType::LessEqual,
             ],
             Parser::term,
-        )
+        )?;
+        return Ok(expr);
     }
 
     pub fn term(&mut self) -> Result<(Token, Expr), RoxyError> {
-        self.left_recursive_parsing(&vec![TokenType::Minus, TokenType::Plus], Parser::factor)
+        let expr =
+            self.left_recursive_parsing(&vec![TokenType::Minus, TokenType::Plus], Parser::factor)?;
+        return Ok(expr);
     }
 
     pub fn factor(&mut self) -> Result<(Token, Expr), RoxyError> {
-        self.left_recursive_parsing(&vec![TokenType::Slash, TokenType::Star], Parser::unary)
+        let expr =
+            self.left_recursive_parsing(&vec![TokenType::Slash, TokenType::Star], Parser::unary)?;
+        return Ok(expr);
     }
 
     pub fn unary(&mut self) -> Result<(Token, Expr), RoxyError> {
@@ -247,6 +250,7 @@ impl Parser {
                 Some(operator) => {
                     let operator = operator.to_owned();
                     let (last_visited_token, right) = self.unary()?;
+
                     return Ok((
                         last_visited_token,
                         Expr::Unary(Unary {
@@ -263,7 +267,8 @@ impl Parser {
             }
         }
 
-        return self.primary();
+        let resp = self.primary()?;
+        return Ok(resp);
     }
 
     pub fn primary(&mut self) -> Result<(Token, Expr), RoxyError> {
@@ -291,10 +296,8 @@ impl Parser {
             return Ok((token, expr));
         }
 
-        println!("here");
         let (token, matched) = self.does_any_token_type_match(&vec![TokenType::LeftParen])?;
         if matched {
-            println!("something");
             let (_, expr) = self.expression()?;
             let last_visited_token = self.consume(
                 &TokenType::RightParen,
@@ -441,7 +444,6 @@ impl Parser {
 
     fn peek(&self) -> Option<Token> {
         let res = self.tokens.get(self.current)?.to_owned();
-        println!("{:?}", res);
         return Some(res);
     }
 }
