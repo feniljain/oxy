@@ -1,0 +1,5 @@
+# Quotes from book
+
+- Recursion in the grammar is a good sign that the language being defined is context-free instead of regular. In particular, recursion where the recursive nonterminal has productions on both sides implies that the language is not regular.
+
+- In a parse tree, every single grammar production becomes a node in the tree. An AST elides productions that aren’t needed by later phases.

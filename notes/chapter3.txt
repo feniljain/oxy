@@ -1,0 +1,33 @@
+# Challenges
+
+## Challenge1:
+
+Question: The lexical grammars of Python and Haskell are not regular. What does that mean, and why aren’t they?
+
+Answer: https://www.reddit.com/r/compsci/comments/kkzn3r/the_lexical_grammars_of_python_and_haskell_are/
+
+## Challenge2:
+
+Question: Aside from separating tokens—distinguishing print foo from printfoo—spaces aren’t used for much in most languages. However, in a couple of dark corners, a space does affect how code is parsed in CoffeeScript, Ruby, and the C preprocessor. Where and what effect does it have in each of those languages?
+
+Answer:
+
+- https://stackoverflow.com/questions/37796947/spaces-inserted-by-the-c-preprocessor
+- https://gcc.gnu.org/onlinedocs/cppinternals/Token-Spacing.html
+
+## Challenge3:
+
+Question: Our scanner here, like most, discards comments and whitespace since those aren’t needed by the parser. Why might you want to write a scanner that does not discard those? What would it be useful for?
+
+Answer: Documentation
+
+## Challenge3:
+
+Answer: Check implementation
+
+## Note, study about following in detail:
+
+- CFG & CSG
+- Regular grammars
+- https://en.wikipedia.org/wiki/Chomsky_hierarchy#The_hierarchy
+- https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form

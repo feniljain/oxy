@@ -1,0 +1,33 @@
+# JIT:
+
+## Notes:
+
+- From what I understood trying to read about JIT, these convert source code to byte code, which needs to be executed by VM, like in case of java JVM. But what extra thing it provides is, it has a profiling setup, what this does is identifies the hotspots in the code and compiles them to native machine code, ofc this is done during runtime, so it is definitely costly. All the profiling setup, identifying important areas and then compiling them to native machine code along with optimizations adds to lot of load on JIT compilers.
+
+- While we talk about AOT compilers, they perform the whole compilation involving optimizations ahead of time itself, i.e. when binaries are produced, but the drawback over here is not all user's archi. are known resulting in multiple compilation steps for diff. archi.s, while language VMs like JVM convert them into bytecode and then use language VMs to handle rest of the stuff.
+
+## Additional Refs:
+
+- https://stackoverflow.com/questions/538056/jit-compiler-vs-offline-compilers
+- https://stackoverflow.com/questions/3221861/does-a-jit-compiler-have-any-disadvantages-compared-to-a-traditional-compiler
+
+# Compilers vs Interpretes:
+
+## Notes:
+
+- Compiler is anything which compiles source code into another form(this could be low-level IR, or even other languages, yes even transpilers are classsified under compilers). It also compiles whole source code ahead of time into binaries.
+
+- On the other hand, interpreter compiles each line as it goes trhough them, i.e. immediate execution.
+
+- Not all types can be classified between compilers and interpreters, because some of them are simply both, e.g. CPython, even Go's compiler is not a only compiler, but is compiler+interpreter.
+
+- Only compilers: Rust, clang, typescript
+
+- Only interpreters: php3, MRI(Ruby)
+
+- Most Lisp compilers are not Just In Time compilers
+
+## Additional Refs:
+
+- https://softwareengineering.stackexchange.com/questions/237505/why-is-studying-a-lisp-interpreter-in-lisp-so-important
+- https://stackoverflow.com/questions/3221861/does-a-jit-compiler-have-any-disadvantages-compared-to-a-traditional-compiler

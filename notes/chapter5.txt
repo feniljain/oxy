@@ -1,0 +1,5 @@
+- https://en.wikipedia.org/wiki/Interpreter_pattern
+- https://en.wikipedia.org/wiki/Expression_problem
+
+- Overloading is static dispatch
+- Overriding is dynamic dispatch
