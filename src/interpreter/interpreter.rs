@@ -29,7 +29,18 @@ impl Interpreter {
                     self.evaluate(&expr_stmt.expression)?;
                 }
                 Stmt::Function(_) => todo!(),
-                Stmt::If(_) => todo!(),
+                Stmt::If(if_stmt) => {
+                    let value = self.evaluate(&if_stmt.condition)?;
+                    if self.is_truthy(&value) {
+                        self.interpret(vec![*if_stmt.then_branch])?;
+                    } else {
+                        if let Some(else_branch) = if_stmt.else_branch {
+                            self.interpret(vec![*else_branch])?;
+                        }
+                    }
+
+                    return Ok(());
+                }
                 Stmt::Print(print_stmt) => {
                     let roxy_type = self.evaluate(&print_stmt.expression)?;
                     match roxy_type {
@@ -124,7 +135,20 @@ impl Interpreter {
             Expr::Get(_) => todo!(),
             Expr::Grouping(expr) => self.evaluate(&expr.expr),
             Expr::Literal(expr) => Ok(expr.value.clone()),
-            Expr::Logical(_) => todo!(),
+            Expr::Logical(expr) => {
+                let left = self.evaluate(&expr.left)?;
+                if expr.operator.token_type == TokenType::Or {
+                    if self.is_truthy(&left) {
+                        return Ok(left);
+                    }
+                } else {
+                    if !self.is_truthy(&left) {
+                        return Ok(left);
+                    }
+                }
+
+                return Ok(self.evaluate(&expr.right)?);
+            }
             Expr::Set(_) => todo!(),
             Expr::Super(_) => todo!(),
             Expr::This(_) => todo!(),
@@ -159,5 +183,13 @@ impl Interpreter {
         }
 
         Ok(())
+    }
+
+    fn is_truthy(&self, value: &RoxyType) -> bool {
+        match value {
+            RoxyType::Boolean(val) => val.clone(),
+            RoxyType::String(_) => true,
+            _ => false,
+        }
     }
 }

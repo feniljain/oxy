@@ -13,14 +13,21 @@ use crate::{RoxyType, TryConversion};
 // declaration    → varDecl
 //                | statement ;
 // statement      → exprStmt
+//                | ifStmt ;
+//                | whileStmt ;
 //                | printStmt ;
 //                | block ;
+// whileStmt      → "while" "(" expression ")" ;
+// ifStmt          → "if" "(" expression ")"
+//                   (else statement)? ;
 // block          → "{" declaration* "}" ;
 // exprStmt       → expression ";" ;
 // printStmt      → "print" expression ";" ;
 // expression     → assignment ;
 // assignment     → IDENTIFIER "=" assignment
-//                | equality ;
+//                | logic_or ;
+//logic_or        → logic_and ( "or" logic_and )* ;
+//logic_and       → equality ( "and" equality )* ;
 // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 // term           → factor ( ( "-" | "+" ) factor )* ;
@@ -37,6 +44,11 @@ pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
     pub errors: Vec<RoxyError>,
+}
+
+pub enum ExprType {
+    Binary,
+    Logical,
 }
 
 impl Parser {
@@ -96,7 +108,7 @@ impl Parser {
     // were reported so check errors field of parser, to get a list of parsing errors
     // - Error is returned meaning there is some critical error
     pub fn parse(&mut self) -> Result<Option<Vec<Stmt>>, RoxyError> {
-        let mut stmts: Vec<Stmt> = vec![];
+        let mut stmts = vec![];
         while !self.is_at_end() {
             match self.declaration() {
                 Ok(stmt) => {
@@ -126,7 +138,7 @@ impl Parser {
             match self.expression() {
                 Ok((_, expr)) => {
                     return Ok(Some(expr));
-                },
+                }
                 Err(err) => {
                     match err {
                         RoxyError::ParserError(ref parser_error) => match parser_error {
@@ -179,6 +191,11 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt, RoxyError> {
+        let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::If])?;
+        if matched {
+            return self.if_stmt(visited_token);
+        }
+
         let (_, matched) = self.does_any_token_type_match(&vec![TokenType::Print])?;
         if matched {
             return self.print_stmt();
@@ -190,6 +207,35 @@ impl Parser {
         }
 
         return self.expr_stmt();
+    }
+
+    fn if_stmt(&mut self, token: Token) -> Result<Stmt, RoxyError> {
+        self.consume(
+            &TokenType::LeftParen,
+            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterIf(token.clone())),
+        )?;
+
+        let (_, condition) = self.expression()?;
+
+        self.consume(
+            &TokenType::LeftParen,
+            RoxyError::ParserError(ParserError::ExpectedRightBraceAfterIf(token.clone())),
+        )?;
+
+        // corresponds to the block after if stmt
+        let then_branch = self.statement()?;
+
+        let mut else_branch: Option<Box<Stmt>> = None;
+        let (_, matched) = self.does_any_token_type_match(&vec![TokenType::Else])?;
+        if matched {
+            else_branch = Some(Box::new(self.statement()?));
+        }
+
+        return Ok(Stmt::If(If {
+            condition,
+            then_branch: Box::new(then_branch),
+            else_branch,
+        }));
     }
 
     fn block(&mut self) -> Result<Stmt, RoxyError> {
@@ -235,6 +281,7 @@ impl Parser {
         token_types: &Vec<TokenType>,
         rule_fn: F,
         // rule_fn: &mut dyn FnMut() -> Result<Expr, LoxError>,
+        expr_type: ExprType,
     ) -> Result<(Token, Expr), RoxyError>
     where
         F: Fn(&mut Parser) -> Result<(Token, Expr), RoxyError>,
@@ -259,11 +306,18 @@ impl Parser {
 
                     last_visited_token = visited_token;
 
-                    expr = Expr::Binary(Binary {
-                        left: Box::new(expr),
-                        operator,
-                        right: Box::new(right),
-                    })
+                    expr = match expr_type {
+                        ExprType::Binary => Expr::Binary(Binary {
+                            left: Box::new(expr),
+                            operator,
+                            right: Box::new(right),
+                        }),
+                        ExprType::Logical => Expr::Logical(Logical {
+                            left: Box::new(expr),
+                            operator,
+                            right: Box::new(right),
+                        }),
+                    };
                 }
                 None => {
                     return Err(RoxyError::ParserError(ParserError::InvalidTokenAccess(
@@ -282,7 +336,7 @@ impl Parser {
 
     fn assignment(&mut self) -> Result<(Token, Expr), RoxyError> {
         let mut last_visited_token: Token;
-        let (_, expr) = self.equality()?;
+        let (_, expr) = self.or()?;
 
         let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Equal])?;
         last_visited_token = visited_token;
@@ -322,10 +376,19 @@ impl Parser {
         return Ok((last_visited_token, expr));
     }
 
+    fn or(&mut self) -> Result<(Token, Expr), RoxyError> {
+        self.left_recursive_parsing(&vec![TokenType::Or], Parser::and, ExprType::Logical)
+    }
+
+    fn and(&mut self) -> Result<(Token, Expr), RoxyError> {
+        self.left_recursive_parsing(&vec![TokenType::And], Parser::equality, ExprType::Logical)
+    }
+
     fn equality(&mut self) -> Result<(Token, Expr), RoxyError> {
         return self.left_recursive_parsing(
             &vec![TokenType::BangEqual, TokenType::EqualEqual],
             Parser::comparison,
+            ExprType::Binary,
         );
     }
 
@@ -338,17 +401,24 @@ impl Parser {
                 TokenType::LessEqual,
             ],
             Parser::term,
+            ExprType::Binary,
         );
     }
 
     pub fn term(&mut self) -> Result<(Token, Expr), RoxyError> {
-        return self
-            .left_recursive_parsing(&vec![TokenType::Minus, TokenType::Plus], Parser::factor);
+        return self.left_recursive_parsing(
+            &vec![TokenType::Minus, TokenType::Plus],
+            Parser::factor,
+            ExprType::Binary,
+        );
     }
 
     pub fn factor(&mut self) -> Result<(Token, Expr), RoxyError> {
-        return self
-            .left_recursive_parsing(&vec![TokenType::Slash, TokenType::Star], Parser::unary);
+        return self.left_recursive_parsing(
+            &vec![TokenType::Slash, TokenType::Star],
+            Parser::unary,
+            ExprType::Binary,
+        );
     }
 
     pub fn unary(&mut self) -> Result<(Token, Expr), RoxyError> {

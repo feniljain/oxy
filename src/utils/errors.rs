@@ -109,6 +109,8 @@ pub enum ParserError {
     ExpectedSemicolon(Token),
     ExpectedVariableName(Token),
     ExpectedRightBraceAfterBlock(Token),
+    ExpectedLeftBraceAfterIf(Token),
+    ExpectedRightBraceAfterIf(Token),
     InvalidAssignmentTarget(Token),
 }
 
@@ -153,6 +155,16 @@ impl std::fmt::Display for ParserError {
             ParserError::ExpectedRightBraceAfterBlock(token) => write!(
                 f,
                 "[line: {:?}] ParserError: Expected '}}' after block: {:?}",
+                token.line, token.lexeme
+            ),
+            ParserError::ExpectedLeftBraceAfterIf(token) => write!(
+                f,
+                "[line: {:?}] ParserError: Expected '(' after if: {:?}",
+                token.line, token.lexeme
+            ),
+            ParserError::ExpectedRightBraceAfterIf(token) => write!(
+                f,
+                "[line: {:?}] ParserError: Expected ')' after if: {:?}",
                 token.line, token.lexeme
             ),
             ParserError::InvalidAssignmentTarget(token) => write!(

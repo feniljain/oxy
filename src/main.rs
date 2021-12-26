@@ -76,6 +76,7 @@ impl TryConversion<bool> for bool {
         match value {
             RoxyType::Boolean(val) => Ok(val),
             RoxyType::NULL => Ok(false),
+            RoxyType::String(_) => Ok(true),
             _ => Err(RoxyError::InterpreterError(
                 InterpreterError::InvalidBooleanCast(token),
             )),
@@ -94,7 +95,7 @@ impl TryConversion<String> for String {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     token_type: TokenType,
     lexeme: String,
