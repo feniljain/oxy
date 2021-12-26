@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'lox'",
+            "name": "Debug executable 'roxy'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=lox",
-                    "--package=lox"
+                    "--bin=roxy",
+                    "--package=roxy"
                 ],
                 "filter": {
-                    "name": "lox",
+                    "name": "roxy",
                     "kind": "bin"
                 }
             },
@@ -25,16 +25,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'lox'",
+            "name": "Debug unit tests in executable 'roxy'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=lox",
-                    "--package=lox"
+                    "--bin=roxy",
+                    "--package=roxy"
                 ],
                 "filter": {
-                    "name": "lox",
+                    "name": "roxy",
                     "kind": "bin"
                 }
             },

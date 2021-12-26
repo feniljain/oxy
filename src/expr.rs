@@ -189,7 +189,7 @@ pub struct Return {
 #[derive(Debug, Clone)]
 pub struct VariableStmt {
     pub name: Token,
-    pub value: Expr,
+    pub value: Option<Expr>,
 }
 
 #[derive(Debug, Clone)]

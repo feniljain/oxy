@@ -1,3 +1,6 @@
+#![feature(map_try_insert)]
+
+pub mod environment;
 pub mod expr;
 pub mod interpreter;
 pub mod parser;
@@ -5,13 +8,13 @@ pub mod scanner;
 pub mod tokens;
 pub mod utils;
 
-use crate::utils::errors::SyntaxError;
 use core::fmt;
 use parser::Parser;
 use std::fmt::Formatter;
 use tokens::TokenType;
 
 use ctrlc;
+use interpreter::Interpreter;
 use std::io::Write;
 use std::{env::args, fs, process::exit};
 use utils::errors::{InterpreterError, RoxyError};
@@ -122,12 +125,12 @@ impl fmt::Display for Token {
     }
 }
 
-struct Interpreter {
+struct CliHandler {
     had_err: bool,
     had_runtime_err: bool,
 }
 
-impl Interpreter {
+impl CliHandler {
     fn new() -> Self {
         Self {
             had_err: false,
@@ -145,7 +148,7 @@ impl Interpreter {
         })?;
 
         loop {
-            let input = Interpreter::prompt("> ");
+            let input = CliHandler::prompt("> ");
 
             if input == "exit" {
                 break;
@@ -172,8 +175,8 @@ impl Interpreter {
         Ok(())
     }
 
-    fn run(&self, contents: String) -> anyhow::Result<()> {
-        let mut scanner = scanner::Scanner::new(contents);
+    fn run(&self, contents: String) -> Result<(), RoxyError> {
+        let mut scanner = scanner::Scanner::new(contents.clone());
         let tokens = scanner.scan_tokens();
 
         // println!("{:?}", tokens);
@@ -182,20 +185,56 @@ impl Interpreter {
         // }
         // println!("\n=========================");
 
+        //TODO: Enable supoprt for expr execution
+        // let mut parser = Parser::new(tokens.clone());
+        // match parser.parse_expression() {
+        //     Ok(expr_opt) => {
+        //         if let Some(expr) = expr_opt {
+        //             println!("Parsing expr successful");
+        //             let mut interpreter = Interpreter::new();
+        //             match interpreter.evaluate(&expr) {
+        //                 Ok(expr) => {
+        //                     println!("Expr: {:?}", expr);
+        //                 }
+        //                 Err(err) => {
+        //                     println!("Runtime Error: {:?}", err.to_string())
+        //                 }
+        //             }
+        //         } else {
+        //             println!("Parsing Expr Unsuccessful");
+        //             for parsing_error in parser.errors {
+        //                 println!("Expr error: {:?}", parsing_error);
+        //             }
+        //         }
+        //     }
+        //     Err(err) => {
+        //         println!(
+        //             "Parsing Expr Unsuccessful Critical Error: {:?}",
+        //             err.to_string()
+        //         );
+        //     }
+        // }
+
         let mut parser = Parser::new(tokens.clone());
-        match parser.parse()? {
-            Some(stmts) => {
-                // println!("Parsing Successful: {:?}", stmts);
-                match self.interpret(stmts) {
-                    Ok(_) => {}
-                    Err(err) => println!("Runtime Error: {:?}", err),
+        match parser.parse() {
+            Ok(stmts_opt) => {
+                match stmts_opt {
+                    Some(stmts) => {
+                        // println!("Parsing Successful: {:?}", stmts);
+                        let mut interpreter = Interpreter::new();
+                        match interpreter.interpret(stmts) {
+                            Ok(_) => {}
+                            Err(err) => println!("Runtime Error: {:?}", err),
+                        }
+                    }
+                    None => {
+                        println!("Parsing Statement Unsuccessful");
+                    }
                 }
             }
-            None => {
-                println!("Parsing Unsuccessful");
-                for parsing_error in parser.errors {
-                    println!("{:?}", parsing_error);
-                }
+            Err(err) => {
+                println!("Parsing Statement Unsuccessful Critical Error");
+                return Err(err);
             }
         }
 
@@ -218,7 +257,7 @@ fn main() {
     let args_n = args().len() - 1;
     let arguments: Vec<String> = args().collect();
 
-    let mut interpreter = Interpreter::new();
+    let mut interpreter = CliHandler::new();
 
     if args_n > 1 {
         println!("Usage: roxy [script]");

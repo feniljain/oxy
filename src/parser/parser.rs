@@ -9,12 +9,18 @@ use crate::{
 use crate::{RoxyType, TryConversion};
 
 // LANGUAGE GRAMMAR
-// program        → statement* EOF ;
+// program        → declaration* EOF ;
+// declaration    → varDecl
+//                | statement ;
 // statement      → exprStmt
 //                | printStmt ;
+//                | block ;
+// block          → "{" declaration* "}" ;
 // exprStmt       → expression ";" ;
 // printStmt      → "print" expression ";" ;
-// expression     → equality ;
+// expression     → assignment ;
+// assignment     → IDENTIFIER "=" assignment
+//                | equality ;
 // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 // term           → factor ( ( "-" | "+" ) factor )* ;
@@ -22,7 +28,7 @@ use crate::{RoxyType, TryConversion};
 // unary          → ( "!" | "-" ) unary
 //                | primary ;
 // primary        → NUMBER | STRING | "true" | "false" | "nil"
-//                | "(" expression ")" ;
+//                | "(" expression ")" | IDENTIFIER ;
 
 //, -> C
 //int a=2 , c=3;
@@ -35,11 +41,11 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        return Self {
+        Self {
             tokens,
             current: 0,
             errors: vec![],
-        };
+        }
     }
 
     pub fn synchronize(&mut self, token: &Token) -> Result<(), RoxyError> {
@@ -92,11 +98,13 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Option<Vec<Stmt>>, RoxyError> {
         let mut stmts: Vec<Stmt> = vec![];
         while !self.is_at_end() {
-            match self.statement() {
+            match self.declaration() {
                 Ok(stmt) => {
                     stmts.push(stmt);
                 }
                 Err(err) => {
+                    //TODO: See how to get this working
+                    // self.synchronize(token);
                     match err {
                         RoxyError::ParserError(ref parser_error) => match parser_error {
                             ParserError::InvalidPeek => return Err(err),
@@ -111,24 +119,63 @@ impl Parser {
         }
 
         Ok(Some(stmts))
+    }
 
-        //match self.expression() {
-        //    Ok(expr) => {
-        //        (soem)
-        //        //Ok(Some(expr))
-        //    },
-        //    Err(err) => {
-        //        match err {
-        //            RoxyError::ParserError(ref parser_error) => match parser_error {
-        //                ParserError::InvalidPeek => return Err(err),
-        //                _ => self.errors.push(err),
-        //            },
-        //            _ => unreachable!(),
-        //        };
+    pub fn parse_expression(&mut self) -> Result<Option<Expr>, RoxyError> {
+        while !self.is_at_end() {
+            match self.expression() {
+                Ok((_, expr)) => {
+                    return Ok(Some(expr));
+                },
+                Err(err) => {
+                    match err {
+                        RoxyError::ParserError(ref parser_error) => match parser_error {
+                            ParserError::InvalidPeek => return Err(err),
+                            _ => self.errors.push(err),
+                        },
+                        _ => unreachable!(),
+                    };
 
-        //        return Ok(None);
-        //    }
-        //}
+                    return Ok(None);
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn declaration(&mut self) -> Result<Stmt, RoxyError> {
+        let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Var])?;
+        if matched {
+            return self.var_decl(visited_token);
+        }
+
+        return self.statement();
+    }
+
+    fn var_decl(&mut self, token: Token) -> Result<Stmt, RoxyError> {
+        let name = self.consume(
+            &TokenType::Identifier,
+            RoxyError::ParserError(ParserError::ExpectedVariableName(token)),
+        )?;
+
+        let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Equal])?;
+        let mut initializer: Option<Expr> = None;
+        if matched {
+            if let Ok((_, expr)) = self.expression() {
+                initializer = Some(expr);
+            }
+        }
+
+        self.consume(
+            &TokenType::Semicolon,
+            RoxyError::ParserError(ParserError::ExpectedSemicolon(visited_token)),
+        )?;
+
+        return Ok(Stmt::VariableStmt(VariableStmt {
+            name,
+            value: initializer,
+        }));
     }
 
     fn statement(&mut self) -> Result<Stmt, RoxyError> {
@@ -137,7 +184,32 @@ impl Parser {
             return self.print_stmt();
         }
 
+        let (_, matched) = self.does_any_token_type_match(&vec![TokenType::LeftBrace])?;
+        if matched {
+            return self.block();
+        }
+
         return self.expr_stmt();
+    }
+
+    fn block(&mut self) -> Result<Stmt, RoxyError> {
+        let mut visited_token: Token;
+        let mut stmts: Vec<Stmt> = vec![];
+        loop {
+            let (token, matched) = self.check(&TokenType::RightBrace)?;
+            visited_token = token;
+            if matched || self.is_at_end() {
+                break;
+            }
+
+            stmts.push(self.declaration()?);
+        }
+
+        self.consume(
+            &TokenType::RightBrace,
+            RoxyError::ParserError(ParserError::ExpectedRightBraceAfterBlock(visited_token)),
+        )?;
+        return Ok(Stmt::Block(Block { statements: stmts }));
     }
 
     fn print_stmt(&mut self) -> Result<Stmt, RoxyError> {
@@ -204,20 +276,61 @@ impl Parser {
         Ok((last_visited_token, expr))
     }
 
-    pub fn expression(&mut self) -> Result<(Token, Expr), RoxyError> {
-        return self.equality();
+    fn expression(&mut self) -> Result<(Token, Expr), RoxyError> {
+        return self.assignment();
     }
 
-    pub fn equality(&mut self) -> Result<(Token, Expr), RoxyError> {
-        let expr = self.left_recursive_parsing(
+    fn assignment(&mut self) -> Result<(Token, Expr), RoxyError> {
+        let mut last_visited_token: Token;
+        let (_, expr) = self.equality()?;
+
+        let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Equal])?;
+        last_visited_token = visited_token;
+        if matched {
+            match self.previous() {
+                Some(prev) => {
+                    let equals = prev;
+                    let (visited_token, value) = self.assignment()?;
+                    last_visited_token = visited_token.clone();
+
+                    match expr {
+                        Expr::Variable(variable) => {
+                            let name = variable.name;
+                            return Ok((
+                                last_visited_token,
+                                Expr::Assign(Assign {
+                                    name,
+                                    value: Box::new(value),
+                                }),
+                            ));
+                        }
+                        _ => {
+                            return Err(RoxyError::ParserError(
+                                ParserError::InvalidAssignmentTarget(equals),
+                            ));
+                        }
+                    }
+                }
+                None => {
+                    return Err(RoxyError::ParserError(ParserError::InvalidTokenAccess(
+                        last_visited_token.to_owned(),
+                    )));
+                }
+            };
+        }
+
+        return Ok((last_visited_token, expr));
+    }
+
+    fn equality(&mut self) -> Result<(Token, Expr), RoxyError> {
+        return self.left_recursive_parsing(
             &vec![TokenType::BangEqual, TokenType::EqualEqual],
             Parser::comparison,
-        )?;
-        return Ok(expr);
+        );
     }
 
     pub fn comparison(&mut self) -> Result<(Token, Expr), RoxyError> {
-        let expr = self.left_recursive_parsing(
+        return self.left_recursive_parsing(
             &vec![
                 TokenType::Greater,
                 TokenType::GreaterEqual,
@@ -225,20 +338,17 @@ impl Parser {
                 TokenType::LessEqual,
             ],
             Parser::term,
-        )?;
-        return Ok(expr);
+        );
     }
 
     pub fn term(&mut self) -> Result<(Token, Expr), RoxyError> {
-        let expr =
-            self.left_recursive_parsing(&vec![TokenType::Minus, TokenType::Plus], Parser::factor)?;
-        return Ok(expr);
+        return self
+            .left_recursive_parsing(&vec![TokenType::Minus, TokenType::Plus], Parser::factor);
     }
 
     pub fn factor(&mut self) -> Result<(Token, Expr), RoxyError> {
-        let expr =
-            self.left_recursive_parsing(&vec![TokenType::Slash, TokenType::Star], Parser::unary)?;
-        return Ok(expr);
+        return self
+            .left_recursive_parsing(&vec![TokenType::Slash, TokenType::Star], Parser::unary);
     }
 
     pub fn unary(&mut self) -> Result<(Token, Expr), RoxyError> {
@@ -267,8 +377,7 @@ impl Parser {
             }
         }
 
-        let resp = self.primary()?;
-        return Ok(resp);
+        return self.primary();
     }
 
     pub fn primary(&mut self) -> Result<(Token, Expr), RoxyError> {
@@ -292,6 +401,12 @@ impl Parser {
 
         if let (token, Some(expr)) =
             self.match_token_types_and_create_literal(&vec![TokenType::Number, TokenType::String])?
+        {
+            return Ok((token, expr));
+        }
+
+        if let (token, Some(expr)) =
+            self.match_token_types_and_create_literal(&vec![TokenType::Identifier])?
         {
             return Ok((token, expr));
         }
@@ -363,6 +478,9 @@ impl Parser {
                             value: RoxyType::NULL,
                         })),
                     )),
+                    TokenType::Identifier => {
+                        Ok((token, Some(Expr::Variable(Variable { name: prev }))))
+                    }
                     _ => return Ok((token.clone(), None)),
                 },
                 None => Err(RoxyError::ParserError(ParserError::InvalidTokenAccess(
@@ -443,7 +561,6 @@ impl Parser {
     }
 
     fn peek(&self) -> Option<Token> {
-        let res = self.tokens.get(self.current)?.to_owned();
-        return Some(res);
+        return Some(self.tokens.get(self.current)?.to_owned());
     }
 }

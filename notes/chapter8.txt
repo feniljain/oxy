@@ -1,0 +1,28 @@
+- Hashmaps are known as:
+    - Java calls them maps or hashmaps.
+    - hash tables
+    - dictionaries (Python and C#)
+    - hashes (Ruby and Perl)
+    - tables (Lua)
+    - associative arrays (PHP)
+    - scatter tables.
+
+- My rule about variables and scoping is, “When in doubt, do what Scheme does”. The Scheme folks have probably spent more time thinking about variable scope than we ever will
+
+- So while talking about declarations and how they should be ordered, languages like java and C# do not look at the bodies of functions at all, and only consider them as decls in the start, giving them an idea of what all functions are present.
+
+    But same when looked in terms of older compilers of C and Pascal, they had limited computing power so they asked programmers to list all the decls in the start itself, they wanted compilers to be a one pass thing.
+
+    This is imp. because of cases like think of recursion where A calls B and B calls A, now if we strictly say that imperative stmts are only allowed and we should know the entity before using it, then cases like these wouldn't be possible at all coz if we keep A before B, but dont know about B, and if we do vice-versa we do not know about A, classic deadlock, now to solve this, above two lang decisions make sense.
+
+- https://en.wikipedia.org/wiki/Parent_pointer_tree
+
+- Declaring global variables are considered a bad practice, there are two reasons for it:
+
+    - One is the traditional one of mutability from any part of the program.
+
+    - Other is very specific to the language being used, and may or may not be applicable to each and every language
+
+    *once read the *Design Note: Implicit Variable Declaration* of chapter 8 and proceed further*
+
+    langs like js introduced strict mode so that global variables dont get assigned automatically and this is why in strict mode it says that global variables are not allowed

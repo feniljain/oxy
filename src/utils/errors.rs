@@ -1,10 +1,11 @@
-use crate::{tokens::TokenType, Token};
+use crate::Token;
 
 #[derive(Debug, Clone)]
 pub enum RoxyError {
-    SyntaxError(SyntaxError),
+    SyntaxError(CompileTimeError),
     ParserError(ParserError),
     InterpreterError(InterpreterError),
+    EnvironmentError(EnvironmentError),
     FileDoesNotExist,
 }
 
@@ -16,6 +17,7 @@ impl std::fmt::Display for RoxyError {
             RoxyError::SyntaxError(err) => write!(f, "{:?}", err),
             RoxyError::ParserError(err) => write!(f, "{:?}", err),
             RoxyError::InterpreterError(err) => write!(f, "{:?}", err),
+            RoxyError::EnvironmentError(err) => write!(f, "{:?}", err),
             RoxyError::FileDoesNotExist => write!(f, "File does not exist"),
         }
     }
@@ -81,13 +83,13 @@ impl std::fmt::Display for InterpreterError {
 }
 
 #[derive(Debug, Clone)]
-pub struct SyntaxError {
+pub struct CompileTimeError {
     pub line: usize,
     pub where_in_file: String, //Just because where is a reserved keyword in rust
     pub message: String,
 }
 
-impl std::fmt::Display for SyntaxError {
+impl std::fmt::Display for CompileTimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             f,
@@ -105,6 +107,9 @@ pub enum ParserError {
     ExpectedRightParen(Token),
     ExpectedExpression(Token),
     ExpectedSemicolon(Token),
+    ExpectedVariableName(Token),
+    ExpectedRightBraceAfterBlock(Token),
+    InvalidAssignmentTarget(Token),
 }
 
 impl std::fmt::Display for ParserError {
@@ -140,51 +145,81 @@ impl std::fmt::Display for ParserError {
                 "[line: {:?}] ParserError: Expected semicolon: {:?}",
                 token.line, token.lexeme
             ),
+            ParserError::ExpectedVariableName(token) => write!(
+                f,
+                "[line: {:?}] ParserError: Expected variable name: {:?}",
+                token.line, token.lexeme
+            ),
+            ParserError::ExpectedRightBraceAfterBlock(token) => write!(
+                f,
+                "[line: {:?}] ParserError: Expected '}}' after block: {:?}",
+                token.line, token.lexeme
+            ),
+            ParserError::InvalidAssignmentTarget(token) => write!(
+                f,
+                "[line: {:?}] ParserError: Invalid  assignment target: {:?}",
+                token.line, token.lexeme
+            ),
         }
     }
 }
 
-impl From<ParserError> for SyntaxError {
-    fn from(parser_error: ParserError) -> Self {
-        match parser_error {
-            ParserError::InvalidTokenAccess(ref token) => SyntaxError {
-                line: token.line,
-                where_in_file: where_in_file(&token),
-                message: parser_error.clone().to_string(),
-            },
-            ParserError::InvalidToken(ref token) => SyntaxError {
-                line: token.line,
-                where_in_file: where_in_file(&token),
-                message: parser_error.to_string(),
-            },
-            ParserError::ExpectedRightParen(ref token) => SyntaxError {
-                line: token.line,
-                where_in_file: where_in_file(&token),
-                message: parser_error.to_string(),
-            },
-            ParserError::ExpectedExpression(ref token) => SyntaxError {
-                line: token.line,
-                where_in_file: where_in_file(&token),
-                message: parser_error.to_string(),
-            },
-            ParserError::ExpectedSemicolon(ref token) => SyntaxError {
-                line: token.line,
-                where_in_file: where_in_file(&token),
-                message: parser_error.to_string(),
-            },
-            ParserError::InvalidPeek => SyntaxError {
-                line: 999999,
-                where_in_file: String::from("where_in_file"),
-                message: parser_error.to_string(),
-            },
+#[derive(Debug, Clone)]
+pub enum EnvironmentError {
+    UndefinedVariable(String),
+}
+
+impl std::fmt::Display for EnvironmentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            EnvironmentError::UndefinedVariable(var_name) => {
+                write!(f, "EnvironmentError: Undefined variable: {:?}.", var_name)
+            }
         }
     }
 }
 
-fn where_in_file(token: &Token) -> String {
-    if token.token_type == TokenType::EOF {
-        return format!("at end");
-    }
+// impl From<ParserError> for SyntaxError {
+//     fn from(parser_error: ParserError) -> Self {
+//         match parser_error {
+//             ParserError::InvalidTokenAccess(ref token) => SyntaxError {
+//                 line: token.line,
+//                 where_in_file: where_in_file(&token),
+//                 message: parser_error.clone().to_string(),
+//             },
+//             ParserError::InvalidToken(ref token) => SyntaxError {
+//                 line: token.line,
+//                 where_in_file: where_in_file(&token),
+//                 message: parser_error.to_string(),
+//             },
+//             ParserError::ExpectedRightParen(ref token) => SyntaxError {
+//                 line: token.line,
+//                 where_in_file: where_in_file(&token),
+//                 message: parser_error.to_string(),
+//             },
+//             ParserError::ExpectedExpression(ref token) => SyntaxError {
+//                 line: token.line,
+//                 where_in_file: where_in_file(&token),
+//                 message: parser_error.to_string(),
+//             },
+//             ParserError::ExpectedSemicolon(ref token) => SyntaxError {
+//                 line: token.line,
+//                 where_in_file: where_in_file(&token),
+//                 message: parser_error.to_string(),
+//             },
+//             ParserError::InvalidPeek => SyntaxError {
+//                 line: 999999,
+//                 where_in_file: String::from("where_in_file"),
+//                 message: parser_error.to_string(),
+//             },
+//         }
+//     }
+// }
 
-    return format!("at '{:?}", token.lexeme);
-}
+// fn where_in_file(token: &Token) -> String {
+//     if token.token_type == TokenType::EOF {
+//         return format!("at end");
+//     }
+
+//     return format!("at '{:?}", token.lexeme);
+// }

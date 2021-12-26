@@ -1,15 +1,29 @@
+use crate::environment::Environment;
 use crate::expr::*;
 use crate::tokens::TokenType;
 use crate::utils::errors::{InterpreterError, RoxyError};
-use crate::Interpreter;
 use crate::{RoxyType, TryConversion};
 
+pub struct Interpreter {
+    environment: Environment,
+}
+
 impl Interpreter {
-    pub fn interpret(&self, stmts: Vec<Stmt>) -> Result<(), RoxyError> {
+    pub fn new() -> Self {
+        Self {
+            environment: Environment::new(None),
+        }
+    }
+
+    pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<(), RoxyError> {
         for stmt in stmts {
-            // let value = self.evaluate(&expr)?;
             match stmt {
-                Stmt::Block(_) => todo!(),
+                Stmt::Block(block) => {
+                    self.execute_block(
+                        block.statements,
+                        Environment::new(Some(Box::new(self.environment.clone()))),
+                    )?;
+                }
                 Stmt::Class(_) => todo!(),
                 Stmt::Expression(expr_stmt) => {
                     self.evaluate(&expr_stmt.expression)?;
@@ -26,19 +40,28 @@ impl Interpreter {
                         RoxyType::Object => println!("Object"),
                     };
                 }
-                Stmt::VariableStmt(_) => todo!(),
+                Stmt::VariableStmt(var_stmt) => {
+                    let mut value: RoxyType = RoxyType::NULL;
+                    if let Some(expr) = var_stmt.value {
+                        value = self.evaluate(&expr)?;
+                    }
+
+                    self.environment.define(var_stmt.name.lexeme, value);
+                }
                 Stmt::While(_) => todo!(),
             }
-
-            // println!("{:?}", value);
         }
 
         Ok(())
     }
 
-    fn evaluate(&self, expr: &Expr) -> Result<RoxyType, RoxyError> {
+    pub fn evaluate(&mut self, expr: &Expr) -> Result<RoxyType, RoxyError> {
         match expr {
-            Expr::Assign(_) => todo!(),
+            Expr::Assign(expr) => {
+                let value = self.evaluate(&expr.value)?;
+                self.environment.assign(expr.name.clone(), value.clone())?;
+                return Ok(value);
+            }
             Expr::Binary(expr) => {
                 let left = self.evaluate(&expr.left)?;
                 let right = self.evaluate(&expr.right)?;
@@ -119,7 +142,22 @@ impl Interpreter {
                     )),
                 }
             }
-            Expr::Variable(_) => todo!(),
+            Expr::Variable(variable) => self.environment.get(variable.name.clone()),
         }
+    }
+
+    fn execute_block(&mut self, stmts: Vec<Stmt>, env: Environment) -> Result<(), RoxyError> {
+        let previous_env = self.environment.clone();
+        self.environment = env;
+        match self.interpret(stmts) {
+            Ok(_) => {}
+            Err(err) => {
+                self.environment = previous_env.clone();
+
+                return Err(err);
+            }
+        }
+
+        Ok(())
     }
 }

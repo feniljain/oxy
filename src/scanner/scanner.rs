@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::utils::errors::RoxyError;
+use crate::utils::errors::{CompileTimeError, RoxyError};
+use crate::Token;
 use crate::{tokens::TokenType, RoxyType};
-use crate::{SyntaxError, Token};
 
 //TODO: Improve error handling
 
@@ -103,7 +103,7 @@ impl Scanner {
                                     }
                                     continue;
                                 } else {
-                                    return Err(RoxyError::SyntaxError(SyntaxError {
+                                    return Err(RoxyError::SyntaxError(CompileTimeError {
                                         line: self.line,
                                         where_in_file: String::new(),
                                         message: String::from("Unterminated multiline comment"),
@@ -123,7 +123,7 @@ impl Scanner {
                                     }
                                     continue;
                                 } else {
-                                    return Err(RoxyError::SyntaxError(SyntaxError {
+                                    return Err(RoxyError::SyntaxError(CompileTimeError {
                                         line: self.line,
                                         where_in_file: String::new(),
                                         message: String::from("Unterminated multiline comment"),
@@ -149,7 +149,7 @@ impl Scanner {
                     } else if self.is_alpha(c) {
                         self.identifier();
                     } else {
-                        return Err(RoxyError::SyntaxError(SyntaxError {
+                        return Err(RoxyError::SyntaxError(CompileTimeError {
                             line: self.line,
                             where_in_file: String::new(),
                             message: String::from("Unparsable token"),
@@ -160,7 +160,7 @@ impl Scanner {
             return Ok(());
         }
 
-        Err(RoxyError::SyntaxError(SyntaxError {
+        Err(RoxyError::SyntaxError(CompileTimeError {
             line: self.line,
             where_in_file: String::new(),
             message: String::from("panic in scanner advancing"),
@@ -237,7 +237,7 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            return Err(RoxyError::SyntaxError(SyntaxError {
+            return Err(RoxyError::SyntaxError(CompileTimeError {
                 line: self.line,
                 where_in_file: String::new(),
                 message: String::from("Unterminated String"),
