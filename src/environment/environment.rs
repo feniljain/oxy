@@ -6,14 +6,21 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    pub enclosing: Option<Box<Environment>>,
     values: HashMap<String, RoxyType>,
+    pub enclosing: Option<Box<Environment>>,
 }
 
 impl Environment {
-    pub fn new(enclosing: Option<Box<Environment>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            enclosing,
+            values: HashMap::new(),
+            enclosing: None,
+        }
+    }
+
+    pub fn new_with_enclosing(enclosing: Box<Environment>) -> Self {
+        Self {
+            enclosing: Some(enclosing),
             values: HashMap::new(),
         }
     }
@@ -38,17 +45,17 @@ impl Environment {
     }
 
     pub fn assign(&mut self, name: Token, value: RoxyType) -> Result<(), RoxyError> {
-        match self.values.try_insert(name.lexeme.clone(), value.clone()) {
-            Ok(_) => Ok(()),
-            Err(_) => {
-                if let Some(enclosing) = &mut self.enclosing {
-                    return enclosing.assign(name, value);
-                }
-
-                return Err(RoxyError::EnvironmentError(
-                    EnvironmentError::UndefinedVariable(name.lexeme),
-                ));
-            }
+        if self.values.contains_key(&name.lexeme) {
+            self.values.insert(name.lexeme.clone(), value);
+            return Ok(());
         }
+
+        if let Some(enclosing) = &mut self.enclosing {
+            return enclosing.assign(name, value);
+        }
+
+        return Err(RoxyError::EnvironmentError(
+            EnvironmentError::UndefinedVariable(name.lexeme),
+        ));
     }
 }

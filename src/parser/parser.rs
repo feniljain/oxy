@@ -13,12 +13,16 @@ use crate::{RoxyType, TryConversion};
 // declaration    → varDecl
 //                | statement ;
 // statement      → exprStmt
+//                | forStmt ;
 //                | ifStmt ;
 //                | whileStmt ;
 //                | printStmt ;
 //                | block ;
-// whileStmt      → "while" "(" expression ")" ;
-// ifStmt          → "if" "(" expression ")"
+// forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
+//                expression? ";"
+//                expression? ")" statement ;
+// whileStmt      → "while" "(" expression ")" statement ;
+// ifStmt         → "if" "(" expression ")"
 //                   (else statement)? ;
 // block          → "{" declaration* "}" ;
 // exprStmt       → expression ";" ;
@@ -26,17 +30,19 @@ use crate::{RoxyType, TryConversion};
 // expression     → assignment ;
 // assignment     → IDENTIFIER "=" assignment
 //                | logic_or ;
-//logic_or        → logic_and ( "or" logic_and )* ;
-//logic_and       → equality ( "and" equality )* ;
+// logic_or       → logic_and ( "or" logic_and )* ;
+// logic_and      → equality ( "and" equality )* ;
 // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 // term           → factor ( ( "-" | "+" ) factor )* ;
 // factor         → unary ( ( "/" | "*" ) unary )* ;
-// unary          → ( "!" | "-" ) unary
-//                | primary ;
+// unary          → ( "!" | "-" ) unary | call ;
+// call           → primary ( "(" arguments? ")" )* ;
+// arguments      → expression ( "," expression )* ;
 // primary        → NUMBER | STRING | "true" | "false" | "nil"
 //                | "(" expression ")" | IDENTIFIER ;
 
+// TODO: Think about how to add this too
 //, -> C
 //int a=2 , c=3;
 
@@ -156,6 +162,60 @@ impl Parser {
         Ok(None)
     }
 
+    pub fn left_recursive_parsing<F>(
+        &mut self,
+        token_types: &Vec<TokenType>,
+        rule_fn: F,
+        // rule_fn: &mut dyn FnMut() -> Result<Expr, LoxError>,
+        expr_type: ExprType,
+    ) -> Result<(Token, Expr), RoxyError>
+    where
+        F: Fn(&mut Parser) -> Result<(Token, Expr), RoxyError>,
+    {
+        let mut last_visited_token: Token;
+        let (visited_token, mut expr) = rule_fn(self)?;
+        last_visited_token = visited_token;
+
+        loop {
+            let (visited_token, matched) = self.does_any_token_type_match(&token_types)?;
+            if !matched {
+                break;
+            }
+
+            last_visited_token = visited_token;
+
+            match self.previous() {
+                Some(operator) => {
+                    let operator = operator.to_owned();
+
+                    let (visited_token, right) = rule_fn(self)?;
+
+                    last_visited_token = visited_token;
+
+                    expr = match expr_type {
+                        ExprType::Binary => Expr::Binary(Binary {
+                            left: Box::new(expr),
+                            operator,
+                            right: Box::new(right),
+                        }),
+                        ExprType::Logical => Expr::Logical(Logical {
+                            left: Box::new(expr),
+                            operator,
+                            right: Box::new(right),
+                        }),
+                    };
+                }
+                None => {
+                    return Err(RoxyError::ParserError(ParserError::InvalidTokenAccess(
+                        last_visited_token.to_owned(),
+                    )));
+                }
+            }
+        }
+
+        Ok((last_visited_token, expr))
+    }
+
     fn declaration(&mut self) -> Result<Stmt, RoxyError> {
         let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Var])?;
         if matched {
@@ -191,6 +251,11 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt, RoxyError> {
+        let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::For])?;
+        if matched {
+            return self.for_stmt(visited_token);
+        }
+
         let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::If])?;
         if matched {
             return self.if_stmt(visited_token);
@@ -201,25 +266,148 @@ impl Parser {
             return self.print_stmt();
         }
 
+        let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::While])?;
+        if matched {
+            return self.while_stmt(visited_token);
+        }
+
         let (_, matched) = self.does_any_token_type_match(&vec![TokenType::LeftBrace])?;
         if matched {
             return self.block();
         }
 
-        return self.expr_stmt();
+        self.expr_stmt()
+    }
+
+    fn for_stmt(&mut self, token: Token) -> Result<Stmt, RoxyError> {
+        self.consume(
+            &TokenType::LeftParen,
+            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterKeyword(
+                String::from("for"),
+                token.clone(),
+            )),
+        )?;
+
+        let initializer_opt;
+        let (_, matched) = self.does_any_token_type_match(&vec![TokenType::Semicolon])?;
+        if matched {
+            initializer_opt = None;
+        } else {
+            let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Var])?;
+            if matched {
+                initializer_opt = Some(self.var_decl(visited_token)?);
+            } else {
+                initializer_opt = Some(self.expr_stmt()?);
+            }
+        }
+
+        let mut condition_opt = None;
+        let (_, matched) = self.check(&TokenType::Semicolon)?;
+        if !matched {
+            let (_, expr) = self.expression()?;
+            condition_opt = Some(expr);
+        }
+
+        self.consume(
+            &TokenType::Semicolon,
+            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterKeyword(
+                String::from("loop condition"),
+                token.clone(),
+            )),
+        )?;
+
+        let mut increment_opt = None;
+        let (_, matched) = self.check(&TokenType::RightParen)?;
+        if !matched {
+            let (_, expr) = self.expression()?;
+            increment_opt = Some(expr);
+        }
+
+        self.consume(
+            &TokenType::RightParen,
+            RoxyError::ParserError(ParserError::ExpectedSemicolonAfterClauses(token.clone())),
+        )?;
+
+        let mut body = self.statement()?;
+
+        if let Some(increment) = increment_opt {
+            body = Stmt::Block(Block {
+                statements: vec![
+                    body,
+                    Stmt::Expression(ExpressionStmt {
+                        expression: increment,
+                    }),
+                ],
+            });
+        }
+
+        let condition: Expr;
+        if let Some(cond) = condition_opt {
+            condition = cond;
+        } else {
+            condition = Expr::Literal(Literal {
+                value: RoxyType::Boolean(true),
+            });
+        }
+
+        body = Stmt::While(While {
+            condition,
+            body: Box::new(body),
+        });
+
+        if let Some(initializer) = initializer_opt {
+            body = Stmt::Block(Block {
+                statements: vec![initializer, body],
+            });
+        }
+
+        Ok(body)
+    }
+
+    fn while_stmt(&mut self, token: Token) -> Result<Stmt, RoxyError> {
+        self.consume(
+            &TokenType::LeftParen,
+            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterKeyword(
+                String::from("while"),
+                token.clone(),
+            )),
+        )?;
+
+        let (token, condition) = self.expression()?;
+
+        self.consume(
+            &TokenType::RightParen,
+            RoxyError::ParserError(ParserError::ExpectedRightBraceAfterKeyword(
+                String::from("while"),
+                token.clone(),
+            )),
+        )?;
+
+        let body = self.statement()?;
+
+        Ok(Stmt::While(While {
+            condition,
+            body: Box::new(body),
+        }))
     }
 
     fn if_stmt(&mut self, token: Token) -> Result<Stmt, RoxyError> {
         self.consume(
             &TokenType::LeftParen,
-            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterIf(token.clone())),
+            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterKeyword(
+                String::from("if"),
+                token.clone(),
+            )),
         )?;
 
-        let (_, condition) = self.expression()?;
+        let (token, condition) = self.expression()?;
 
         self.consume(
             &TokenType::LeftParen,
-            RoxyError::ParserError(ParserError::ExpectedRightBraceAfterIf(token.clone())),
+            RoxyError::ParserError(ParserError::ExpectedRightBraceAfterKeyword(
+                String::from("if"),
+                token.clone(),
+            )),
         )?;
 
         // corresponds to the block after if stmt
@@ -274,60 +462,6 @@ impl Parser {
             RoxyError::ParserError(ParserError::ExpectedSemicolon(last_visited_token.clone())),
         )?;
         return Ok(Stmt::Expression(ExpressionStmt { expression: expr }));
-    }
-
-    pub fn left_recursive_parsing<F>(
-        &mut self,
-        token_types: &Vec<TokenType>,
-        rule_fn: F,
-        // rule_fn: &mut dyn FnMut() -> Result<Expr, LoxError>,
-        expr_type: ExprType,
-    ) -> Result<(Token, Expr), RoxyError>
-    where
-        F: Fn(&mut Parser) -> Result<(Token, Expr), RoxyError>,
-    {
-        let mut last_visited_token: Token;
-        let (visited_token, mut expr) = rule_fn(self)?;
-        last_visited_token = visited_token;
-
-        loop {
-            let (visited_token, matched) = self.does_any_token_type_match(&token_types)?;
-            if !matched {
-                break;
-            }
-
-            last_visited_token = visited_token;
-
-            match self.previous() {
-                Some(operator) => {
-                    let operator = operator.to_owned();
-
-                    let (visited_token, right) = rule_fn(self)?;
-
-                    last_visited_token = visited_token;
-
-                    expr = match expr_type {
-                        ExprType::Binary => Expr::Binary(Binary {
-                            left: Box::new(expr),
-                            operator,
-                            right: Box::new(right),
-                        }),
-                        ExprType::Logical => Expr::Logical(Logical {
-                            left: Box::new(expr),
-                            operator,
-                            right: Box::new(right),
-                        }),
-                    };
-                }
-                None => {
-                    return Err(RoxyError::ParserError(ParserError::InvalidTokenAccess(
-                        last_visited_token.to_owned(),
-                    )));
-                }
-            }
-        }
-
-        Ok((last_visited_token, expr))
     }
 
     fn expression(&mut self) -> Result<(Token, Expr), RoxyError> {

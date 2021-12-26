@@ -4,8 +4,6 @@ use crate::utils::errors::{CompileTimeError, RoxyError};
 use crate::Token;
 use crate::{tokens::TokenType, RoxyType};
 
-//TODO: Improve error handling
-
 pub struct Scanner {
     source: String,
     tokens: Vec<Token>,
@@ -27,16 +25,10 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> &Vec<Token> {
+    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, RoxyError> {
         while !self.is_at_end() {
             self.start = self.current;
-            //TODO: Check how to handle this properly
-            match self.scan_token() {
-                Ok(_) => {}
-                Err(err) => {
-                    println!("Encountered an error {:?}", err);
-                }
-            }
+            self.scan_token()?;
         }
 
         self.tokens.push(Token {
@@ -45,7 +37,8 @@ impl Scanner {
             literal: RoxyType::NULL,
             line: self.line,
         });
-        return &self.tokens;
+
+        return Ok(&self.tokens);
     }
 
     pub fn is_at_end(&self) -> bool {
@@ -70,6 +63,20 @@ impl Scanner {
                         self.add_token(TokenType::EqualEqual, None);
                     } else {
                         self.add_token(TokenType::Equal, None)
+                    }
+                }
+                '<' => {
+                    if self.lookahead_one_step('=') {
+                        self.add_token(TokenType::LessEqual, None);
+                    } else {
+                        self.add_token(TokenType::Less, None)
+                    }
+                }
+                '>' => {
+                    if self.lookahead_one_step('=') {
+                        self.add_token(TokenType::GreaterEqual, None);
+                    } else {
+                        self.add_token(TokenType::Greater, None)
                     }
                 }
                 '!' => {

@@ -5,13 +5,13 @@ use crate::utils::errors::{InterpreterError, RoxyError};
 use crate::{RoxyType, TryConversion};
 
 pub struct Interpreter {
-    environment: Environment,
+    environment: Box<Environment>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            environment: Environment::new(None),
+            environment: Box::new(Environment::new()),
         }
     }
 
@@ -19,10 +19,7 @@ impl Interpreter {
         for stmt in stmts {
             match stmt {
                 Stmt::Block(block) => {
-                    self.execute_block(
-                        block.statements,
-                        Environment::new(Some(Box::new(self.environment.clone()))),
-                    )?;
+                    self.execute_block(block.statements, None)?;
                 }
                 Stmt::Class(_) => todo!(),
                 Stmt::Expression(expr_stmt) => {
@@ -42,6 +39,7 @@ impl Interpreter {
                     return Ok(());
                 }
                 Stmt::Print(print_stmt) => {
+                    //TODO: Define print and println properly
                     let roxy_type = self.evaluate(&print_stmt.expression)?;
                     match roxy_type {
                         RoxyType::String(type_string) => println!("{:?}", type_string),
@@ -59,7 +57,14 @@ impl Interpreter {
 
                     self.environment.define(var_stmt.name.lexeme, value);
                 }
-                Stmt::While(_) => todo!(),
+                Stmt::While(while_stmt) => {
+                    let mut condition = self.evaluate(&while_stmt.condition)?;
+                    //TODO: Implement break(and continue) keywords
+                    while self.is_truthy(&condition) {
+                        self.interpret(vec![*(while_stmt.body.clone())])?;
+                        condition = self.evaluate(&while_stmt.condition)?;
+                    }
+                }
             }
         }
 
@@ -97,17 +102,22 @@ impl Interpreter {
                         (f64::try_conversion(left, expr.operator.clone())?)
                             * (f64::try_conversion(right, expr.operator.clone())?),
                     )),
-                    TokenType::Plus => match (left, right) {
-                        (RoxyType::String(val_left), RoxyType::String(val_right)) => {
-                            Ok(RoxyType::String(format!("{}{}", val_left, val_right)))
+                    TokenType::Plus => {
+                        // println!("lEft: {:?} \nRight: {:?}\n--", left, right);
+                        match (left, right) {
+                            (RoxyType::String(val_left), RoxyType::String(val_right)) => {
+                                Ok(RoxyType::String(format!("{}{}", val_left, val_right)))
+                            }
+                            (RoxyType::Number(val_left), RoxyType::Number(val_right)) => {
+                                Ok(RoxyType::Number(val_left + val_right))
+                            }
+                            _ => Err(RoxyError::InterpreterError(
+                                InterpreterError::InvalidOperationOnGivenTypes(
+                                    expr.operator.clone(),
+                                ),
+                            )),
                         }
-                        (RoxyType::Number(val_left), RoxyType::Number(val_right)) => {
-                            Ok(RoxyType::Number(val_left + val_right))
-                        }
-                        _ => Err(RoxyError::InterpreterError(
-                            InterpreterError::InvalidOperationOnGivenTypes(expr.operator.clone()),
-                        )),
-                    },
+                    }
                     TokenType::Greater => Ok(RoxyType::Boolean(
                         (f64::try_conversion(left, expr.operator.clone())?)
                             > (f64::try_conversion(right, expr.operator.clone())?),
@@ -166,23 +176,25 @@ impl Interpreter {
                     )),
                 }
             }
-            Expr::Variable(variable) => self.environment.get(variable.name.clone()),
+            Expr::Variable(variable) => {
+                return self.environment.get(variable.name.clone());
+            }
         }
     }
 
-    fn execute_block(&mut self, stmts: Vec<Stmt>, env: Environment) -> Result<(), RoxyError> {
-        let previous_env = self.environment.clone();
-        self.environment = env;
-        match self.interpret(stmts) {
-            Ok(_) => {}
-            Err(err) => {
-                self.environment = previous_env.clone();
-
-                return Err(err);
-            }
-        }
-
-        Ok(())
+    fn execute_block(
+        &mut self,
+        stmts: Vec<Stmt>,
+        env: Option<Environment>,
+    ) -> Result<(), RoxyError> {
+        let new = match env {
+            Some(e) => Box::new(Environment::new_with_enclosing(Box::new(e))),
+            None => Box::new(Environment::new_with_enclosing(self.environment.clone())),
+        };
+        self.environment = new;
+        let res = self.interpret(stmts);
+        self.environment = self.environment.clone().enclosing.unwrap();
+        res
     }
 
     fn is_truthy(&self, value: &RoxyType) -> bool {

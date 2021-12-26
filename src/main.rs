@@ -1,5 +1,3 @@
-#![feature(map_try_insert)]
-
 pub mod environment;
 pub mod expr;
 pub mod interpreter;
@@ -165,6 +163,7 @@ impl CliHandler {
     fn run_file(&self, file_name: &str) -> anyhow::Result<()> {
         let contents = fs::read_to_string(file_name)?;
         self.run(contents)?;
+
         if self.had_err {
             exit(65);
         }
@@ -178,7 +177,7 @@ impl CliHandler {
 
     fn run(&self, contents: String) -> Result<(), RoxyError> {
         let mut scanner = scanner::Scanner::new(contents.clone());
-        let tokens = scanner.scan_tokens();
+        let tokens = scanner.scan_tokens()?;
 
         // println!("{:?}", tokens);
         // for token in tokens {
@@ -225,11 +224,14 @@ impl CliHandler {
                         let mut interpreter = Interpreter::new();
                         match interpreter.interpret(stmts) {
                             Ok(_) => {}
-                            Err(err) => println!("Runtime Error: {:?}", err),
+                            Err(err) => println!("{:?}", err),
                         }
                     }
                     None => {
                         println!("Parsing Statement Unsuccessful");
+                        for parsing_error in parser.errors {
+                            println!("{:?}", parsing_error);
+                        }
                     }
                 }
             }
@@ -266,7 +268,7 @@ fn main() {
     } else if args_n == 1 {
         match interpreter.run_file(&arguments[1]) {
             Ok(_) => (),
-            //TODO: Confirm if this code is proper for exit with this error
+            // TODO: Confirm if this code is proper for exit with this error
             Err(err) => {
                 println!("{:?}", err);
                 exit(64);

@@ -1,0 +1,12 @@
+var a=1;
+var b=2;
+print(a>b);
+print(a<b);
+print(a<3);
+b=b+1;
+print(b>=3);
+print(b>4);
+print(b<2);
+print(b==3);
+a=b+a;
+print(a==4);

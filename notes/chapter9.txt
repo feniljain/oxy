@@ -7,3 +7,10 @@ If your language is expressive enough to do that, it’s considered Turing-compl
 - An if statement lets you conditionally execute statements and the conditional operator(ternary operator) lets you conditionally execute expressions.
 
 - https://en.wikipedia.org/wiki/Dangling_else
+
+- Two types of formal basic compulational models:
+
+    - Turing machine
+    - Lambda calculus
+
+  Most programming languages are based on one of the above mentioned models.

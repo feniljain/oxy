@@ -1,0 +1,3 @@
+- The rule uses * to allow matching a series of calls like fn(1)(2)(3). Code like that isn’t common in C-style languages, but it is in the family of languages derived from ML. There, the normal way of defining a function that takes multiple arguments is as a series of nested functions. Each function takes one argument and returns a new function. That function consumes the next argument, returns yet another function, and so on. Eventually, once all of the arguments are consumed, the last function completes the operation.
+
+This style, called currying, after Haskell Curry (the same guy whose first name graces that other well-known functional language), is baked directly into the language syntax so it’s not as weird looking as it would be here.

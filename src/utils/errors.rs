@@ -99,6 +99,7 @@ impl std::fmt::Display for CompileTimeError {
     }
 }
 
+//TODO: Merge errors which need not be seperate
 #[derive(Debug, Clone)]
 pub enum ParserError {
     InvalidPeek,               // TODO: Think do we need this error?
@@ -109,8 +110,9 @@ pub enum ParserError {
     ExpectedSemicolon(Token),
     ExpectedVariableName(Token),
     ExpectedRightBraceAfterBlock(Token),
-    ExpectedLeftBraceAfterIf(Token),
-    ExpectedRightBraceAfterIf(Token),
+    ExpectedLeftBraceAfterKeyword(String, Token),
+    ExpectedRightBraceAfterKeyword(String, Token),
+    ExpectedSemicolonAfterClauses(Token),
     InvalidAssignmentTarget(Token),
 }
 
@@ -157,14 +159,19 @@ impl std::fmt::Display for ParserError {
                 "[line: {:?}] ParserError: Expected '}}' after block: {:?}",
                 token.line, token.lexeme
             ),
-            ParserError::ExpectedLeftBraceAfterIf(token) => write!(
+            ParserError::ExpectedLeftBraceAfterKeyword(keyword, token) => write!(
                 f,
-                "[line: {:?}] ParserError: Expected '(' after if: {:?}",
-                token.line, token.lexeme
+                "[line: {:?}] ParserError: Expected '(' after {:?}: {:?}",
+                token.line, keyword, token.lexeme
             ),
-            ParserError::ExpectedRightBraceAfterIf(token) => write!(
+            ParserError::ExpectedRightBraceAfterKeyword(keyword, token) => write!(
                 f,
-                "[line: {:?}] ParserError: Expected ')' after if: {:?}",
+                "[line: {:?}] ParserError: Expected ')' after {:?}: {:?}",
+                token.line, keyword, token.lexeme
+            ),
+            ParserError::ExpectedSemicolonAfterClauses(token) => write!(
+                f,
+                "[line: {:?}] ParserError: Expected ';' after clauses: {:?}",
                 token.line, token.lexeme
             ),
             ParserError::InvalidAssignmentTarget(token) => write!(

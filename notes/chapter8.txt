@@ -1,4 +1,4 @@
-- Hashmaps are known as:
+- Hashmaps are also known as:
     - Java calls them maps or hashmaps.
     - hash tables
     - dictionaries (Python and C#)
