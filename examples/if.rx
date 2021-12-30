@@ -1,0 +1,12 @@
+var n=1;
+if(n==1) {
+    print "true";
+}
+
+if (n==1) print "true";
+
+if(n>1) {
+    print "true";
+} else {
+    print "false";
+}

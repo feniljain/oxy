@@ -144,6 +144,7 @@ pub enum Stmt {
     Print(Print),
     VariableStmt(VariableStmt),
     While(While),
+    Return(Return),
 }
 
 #[derive(Debug, Clone)]
@@ -185,7 +186,7 @@ pub struct Print {
 #[derive(Debug, Clone)]
 pub struct Return {
     pub keyword: Token,
-    pub value: Expr,
+    pub value: Option<Expr>,
 }
 
 #[derive(Debug, Clone)]

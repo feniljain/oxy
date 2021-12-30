@@ -1,0 +1,21 @@
+fun sayHi(first, last) {
+  print "Hi, " + first + " " + last + "!";
+
+  print(first=="Dear");
+  if(first=="Dear") {
+    print(first=="Soemthing");
+    return "something Dear";
+  }
+
+  return "something";
+}
+
+sayHi("Dear", "Reader");
+
+fun sayHi1(first, last) {
+  print "Hi, " + first + " " + last + "!!";
+}
+
+var res = sayHi("Dear", "Reader");
+sayHi1("Dear", "Reader");
+print res;

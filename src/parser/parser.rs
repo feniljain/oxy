@@ -10,14 +10,21 @@ use crate::{RoxyType, TryConversion};
 
 // LANGUAGE GRAMMAR
 // program        → declaration* EOF ;
-// declaration    → varDecl
+// declaration    → funDecl
+//                | varDecl
 //                | statement ;
+// funDecl        → "fun" function ;
+// varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+// function       → IDENTIFIER "(" parameters? ")" block ;
+// parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
 // statement      → exprStmt
-//                | forStmt ;
-//                | ifStmt ;
-//                | whileStmt ;
-//                | printStmt ;
+//                | forStmt
+//                | ifStmt
+//                | whileStmt
+//                | printStmt
+//                | returnStmt
 //                | block ;
+// returnStmt     → "return" expression? ";" ;
 // forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
 //                expression? ";"
 //                expression? ")" statement ;
@@ -217,12 +224,82 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Result<Stmt, RoxyError> {
+        let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Fun])?;
+        if matched {
+            return self.function(visited_token, String::from("function"));
+        }
+
         let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Var])?;
         if matched {
             return self.var_decl(visited_token);
         }
 
         return self.statement();
+    }
+
+    fn function(&mut self, token: Token, kind: String) -> Result<Stmt, RoxyError> {
+        let mut last_visited_token = token;
+        let name = self.consume(
+            &TokenType::Identifier,
+            RoxyError::ParserError(ParserError::ExpectedIndetifier(
+                kind,
+                last_visited_token.clone(),
+            )),
+        )?;
+
+        self.consume(
+            &TokenType::LeftParen,
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                "(".into(),
+                "function name".into(),
+                last_visited_token,
+            )),
+        )?;
+
+        let mut params = vec![];
+        let (visited_token, matched) = self.check(&TokenType::RightParen)?;
+        last_visited_token = visited_token;
+        if !matched {
+            loop {
+                if params.len() > 255 {
+                    return Err(RoxyError::ParserError(
+                        ParserError::CannotHaveMoreThan255Arguments(last_visited_token),
+                    ));
+                }
+
+                let token = self.consume(
+                    &TokenType::Identifier,
+                    RoxyError::ParserError(ParserError::ExpectedParameterName(last_visited_token)),
+                )?;
+
+                params.push(token);
+
+                let (visited_token, matched) =
+                    self.does_any_token_type_match(&vec![TokenType::Comma])?;
+                last_visited_token = visited_token;
+                if !matched {
+                    break;
+                }
+            }
+        }
+
+        self.consume(
+            &TokenType::RightParen,
+            RoxyError::ParserError(ParserError::ExpectedRightParen(last_visited_token.clone())),
+        )?;
+
+        self.consume(
+            &TokenType::LeftBrace,
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                "{".into(),
+                "function name".into(),
+                last_visited_token,
+            )),
+        )?;
+
+        let body = self.block()?;
+
+        Ok(Stmt::Function(Function { name, params, body }))
     }
 
     fn var_decl(&mut self, token: Token) -> Result<Stmt, RoxyError> {
@@ -266,6 +343,11 @@ impl Parser {
             return self.print_stmt();
         }
 
+        let (_, matched) = self.does_any_token_type_match(&vec![TokenType::Return])?;
+        if matched {
+            return self.return_stmt(visited_token);
+        }
+
         let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::While])?;
         if matched {
             return self.while_stmt(visited_token);
@@ -273,17 +355,40 @@ impl Parser {
 
         let (_, matched) = self.does_any_token_type_match(&vec![TokenType::LeftBrace])?;
         if matched {
-            return self.block();
+            return Ok(Stmt::Block(Block {
+                statements: self.block()?,
+            }));
         }
 
         self.expr_stmt()
     }
 
+    fn return_stmt(&mut self, token: Token) -> Result<Stmt, RoxyError> {
+        let keyword = token.clone();
+        let mut last_visited_token = token;
+        let mut value = None;
+
+        let (_, matched) = self.check(&TokenType::Semicolon)?;
+        if !matched {
+            let (visited_token, expr) = self.expression()?;
+            last_visited_token = visited_token;
+            value = Some(expr);
+        }
+
+        self.consume(
+            &TokenType::Semicolon,
+            RoxyError::ParserError(ParserError::ExpectedSemicolon(last_visited_token)),
+        )?;
+
+        return Ok(Stmt::Return(Return { keyword, value }));
+    }
+
     fn for_stmt(&mut self, token: Token) -> Result<Stmt, RoxyError> {
         self.consume(
             &TokenType::LeftParen,
-            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterKeyword(
-                String::from("for"),
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                "(".into(),
+                "for".into(),
                 token.clone(),
             )),
         )?;
@@ -310,8 +415,9 @@ impl Parser {
 
         self.consume(
             &TokenType::Semicolon,
-            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterKeyword(
-                String::from("loop condition"),
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                ";".into(),
+                "loop condition".into(),
                 token.clone(),
             )),
         )?;
@@ -367,8 +473,9 @@ impl Parser {
     fn while_stmt(&mut self, token: Token) -> Result<Stmt, RoxyError> {
         self.consume(
             &TokenType::LeftParen,
-            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterKeyword(
-                String::from("while"),
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                "(".into(),
+                "while".into(),
                 token.clone(),
             )),
         )?;
@@ -377,8 +484,9 @@ impl Parser {
 
         self.consume(
             &TokenType::RightParen,
-            RoxyError::ParserError(ParserError::ExpectedRightBraceAfterKeyword(
-                String::from("while"),
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                ")".into(),
+                "while".into(),
                 token.clone(),
             )),
         )?;
@@ -394,8 +502,9 @@ impl Parser {
     fn if_stmt(&mut self, token: Token) -> Result<Stmt, RoxyError> {
         self.consume(
             &TokenType::LeftParen,
-            RoxyError::ParserError(ParserError::ExpectedLeftBraceAfterKeyword(
-                String::from("if"),
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                "(".into(),
+                "if".into(),
                 token.clone(),
             )),
         )?;
@@ -403,9 +512,10 @@ impl Parser {
         let (token, condition) = self.expression()?;
 
         self.consume(
-            &TokenType::LeftParen,
-            RoxyError::ParserError(ParserError::ExpectedRightBraceAfterKeyword(
-                String::from("if"),
+            &TokenType::RightParen,
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                ")".into(),
+                "if condition".into(),
                 token.clone(),
             )),
         )?;
@@ -426,7 +536,8 @@ impl Parser {
         }));
     }
 
-    fn block(&mut self) -> Result<Stmt, RoxyError> {
+    //NOTE: Always consume LeftBrace before calling this method
+    fn block(&mut self) -> Result<Vec<Stmt>, RoxyError> {
         let mut visited_token: Token;
         let mut stmts: Vec<Stmt> = vec![];
         loop {
@@ -443,7 +554,7 @@ impl Parser {
             &TokenType::RightBrace,
             RoxyError::ParserError(ParserError::ExpectedRightBraceAfterBlock(visited_token)),
         )?;
-        return Ok(Stmt::Block(Block { statements: stmts }));
+        return Ok(stmts);
     }
 
     fn print_stmt(&mut self) -> Result<Stmt, RoxyError> {
@@ -581,10 +692,77 @@ impl Parser {
             }
         }
 
-        return self.primary();
+        return self.call();
     }
 
-    pub fn primary(&mut self) -> Result<(Token, Expr), RoxyError> {
+    fn call(&mut self) -> Result<(Token, Expr), RoxyError> {
+        let mut last_visited_token: Token;
+        let (_, mut expr) = self.primary()?;
+
+        loop {
+            let (visited_token, matched) =
+                self.does_any_token_type_match(&vec![TokenType::LeftParen])?;
+            last_visited_token = visited_token;
+            if !matched {
+                break;
+            }
+
+            let (_, finish_call_expr) = self.finish_call(&expr)?;
+            expr = finish_call_expr;
+        }
+
+        return Ok((last_visited_token, expr));
+    }
+
+    fn finish_call(&mut self, callee: &Expr) -> Result<(Token, Expr), RoxyError> {
+        let mut last_visited_token: Token;
+        let mut arguments = vec![];
+
+        let (visited_token, matched) = self.check(&TokenType::RightParen)?;
+        last_visited_token = visited_token;
+        if !matched {
+            loop {
+                let (visited_token, expr) = self.expression()?;
+                last_visited_token = visited_token;
+
+                if arguments.len() > 255 {
+                    return Err(RoxyError::ParserError(
+                        ParserError::CannotHaveMoreThan255Arguments(last_visited_token),
+                    ));
+                }
+
+                arguments.push(expr);
+
+                let (visited_token, matched) =
+                    self.does_any_token_type_match(&vec![TokenType::Comma])?;
+                last_visited_token = visited_token;
+
+                if !matched {
+                    break;
+                }
+            }
+        }
+
+        let paren = self.consume(
+            &TokenType::RightParen,
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                ")".into(),
+                "arugments".into(),
+                last_visited_token.clone(),
+            )),
+        )?;
+
+        return Ok((
+            last_visited_token,
+            Expr::Call(Call {
+                callee: Box::new(callee.to_owned()),
+                paren,
+                arguments,
+            }),
+        ));
+    }
+
+    fn primary(&mut self) -> Result<(Token, Expr), RoxyError> {
         if let (token, Some(expr)) =
             self.match_token_types_and_create_literal(&vec![TokenType::False])?
         {

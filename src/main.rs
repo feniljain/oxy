@@ -1,3 +1,4 @@
+pub mod callable;
 pub mod environment;
 pub mod expr;
 pub mod interpreter;
@@ -6,9 +7,11 @@ pub mod scanner;
 pub mod tokens;
 pub mod utils;
 
-use core::fmt;
+use core::fmt::Debug;
+use environment::Environment;
+use expr::Stmt;
 use parser::Parser;
-use std::fmt::Formatter;
+use std::fmt::{self, Formatter};
 use tokens::TokenType;
 
 use ctrlc;
@@ -17,6 +20,9 @@ use std::io::Write;
 use std::{env::args, fs, process::exit};
 use utils::errors::{InterpreterError, RoxyError};
 
+// TODO: Write tests for every component
+
+//TODO: Move all these into a separate file
 #[derive(Debug, Clone)]
 pub enum RoxyType {
     String(String),
@@ -24,6 +30,61 @@ pub enum RoxyType {
     NULL,
     Boolean(bool),
     Object,
+    RoxyFunction(RoxyFunction),
+    NativeFunction(NativeFunction),
+}
+
+//TODO: Implement Debug properly for both functions
+#[derive(Clone)]
+pub struct NativeFunction {
+    pub name: String,
+    pub arity: usize,
+    pub params: Vec<Token>,
+    pub callable: fn(
+        roxy_type: &RoxyType,
+        interpreter: &mut Interpreter,
+        arguments: Vec<RoxyType>,
+        token: Token,
+    ) -> Result<RoxyType, RoxyError>,
+}
+
+impl Debug for NativeFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("NativeFunction")
+            .field("name", &self.name)
+            .field("arity", &self.arity)
+            .finish()
+    }
+}
+
+impl std::fmt::Display for NativeFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "<{:?}>", self.name)
+    }
+}
+
+#[derive(Clone)]
+pub struct RoxyFunction {
+    pub name: String,
+    pub arity: usize,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+    pub closure: Box<Environment>,
+}
+
+impl Debug for RoxyFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("RoxyFunction")
+            .field("name", &self.name)
+            .field("arity", &self.arity)
+            .finish()
+    }
+}
+
+impl std::fmt::Display for RoxyFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "<{:?}>", self.name)
+    }
 }
 
 impl PartialEq for RoxyType {
@@ -44,12 +105,15 @@ impl PartialEq for RoxyType {
 impl std::fmt::Display for RoxyType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         //TODO: Improve Object part
+        //TODO: Improve NativeFunc & RoxyFunction part
         match self {
             RoxyType::String(streeng) => write!(f, "{}", streeng),
             RoxyType::Number(no) => write!(f, "{}", no),
             RoxyType::NULL => write!(f, "NULL"),
             RoxyType::Boolean(boole) => write!(f, "{:?}", boole),
             RoxyType::Object => write!(f, "object"),
+            RoxyType::RoxyFunction(_) => write!(f, "RoxyFunction"),
+            RoxyType::NativeFunction(_) => write!(f, "NativeFunction"),
         }
     }
 }
@@ -222,9 +286,8 @@ impl CliHandler {
                     Some(stmts) => {
                         // println!("Parsing Successful: {:?}", stmts);
                         let mut interpreter = Interpreter::new();
-                        match interpreter.interpret(stmts) {
-                            Ok(_) => {}
-                            Err(err) => println!("{:?}", err),
+                        for stmt in stmts {
+                            interpreter.interpret(stmt)?;
                         }
                     }
                     None => {

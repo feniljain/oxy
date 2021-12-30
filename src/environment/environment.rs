@@ -10,13 +10,26 @@ pub struct Environment {
     pub enclosing: Option<Box<Environment>>,
 }
 
-impl Environment {
+impl<'env> Environment {
     pub fn new() -> Self {
         Self {
             values: HashMap::new(),
             enclosing: None,
         }
     }
+
+    // pub fn update(
+    //     &mut self,
+    //     values_opt: Option<HashMap<String, RoxyType>>,
+    //     enclosing_opt: Option<Option<Box<Environment>>>,
+    // ) {
+    //     if let Some(values) = values_opt {
+    //         self.values = values;
+    //     }
+    //     if let Some(enclosing) = enclosing_opt {
+    //         self.enclosing = enclosing;
+    //     }
+    // }
 
     pub fn new_with_enclosing(enclosing: Box<Environment>) -> Self {
         Self {
@@ -59,3 +72,12 @@ impl Environment {
         ));
     }
 }
+
+// impl Default for Environment {
+//     fn default() -> Self {
+//         Self {
+//             values: HashMap::new(),
+//             enclosing: None,
+//         }
+//     }
+// }
