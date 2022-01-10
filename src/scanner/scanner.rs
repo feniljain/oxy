@@ -13,6 +13,7 @@ pub struct Scanner {
     keywords: HashMap<String, TokenType>,
 }
 
+//TODO: Fix multiline comments
 impl Scanner {
     pub fn new(source: String) -> Self {
         Self {

@@ -1,0 +1,21 @@
+- There are three broad paths to object-oriented programming: classes, prototypes, and multimethods.
+
+- Classes came first and are the most popular style. With the rise of JavaScript (and to a lesser extent Lua), prototypes are more widely known than they used to be.
+
+Multimethods: https://en.wikipedia.org/wiki/Multiple_dispatch
+
+Difference between multimethods and method overloading: https://stackoverflow.com/questions/1801216/what-is-the-difference-between-multiple-dispatch-and-method-overloading/1801230
+
+- The Sun JVM is written in C, although this need not be the case - the JVM as it runs on your machine is a platform-dependent executable and hence could have been originally written in any language. For example, the original IBM JVM was written in Smalltalk.
+
+- The Java libraries (java.lang, java.util etc, often referred to as the Java API) are themselves written in Java, although methods marked as native will have been written in C or C++.
+
+- Java compiler provided by Sun is also written in Java.
+
+- Javascript Hidden Classes and Inline Caching in V8: http://richardartoul.github.io/jekyll/update/2015/04/26/hidden-classes.html
+
+- Paradoxically, many of the optimizations invented to make dynamic languages fast rest on the observation that—even in those languages—most code is fairly static in terms of the types of objects it works with and their fields.
+
+- Fields vs properties: Fields are named bits of state stored directly in an instance. Properties are the named, uh, things, that a get expression may return.
+
+- “i” for loop variables predates OOP and goes all the way back to Fortran.

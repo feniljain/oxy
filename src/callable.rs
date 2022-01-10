@@ -1,10 +1,11 @@
 use core::fmt::Debug;
+use std::collections::HashMap;
 
 use crate::{
     environment::Environment,
     interpreter::Interpreter,
     utils::errors::{InterpreterError, RoxyError},
-    RoxyType, Token,
+    RoxyInstance, RoxyType, Token,
 };
 
 pub trait Callable: Debug {
@@ -29,17 +30,21 @@ impl Callable for RoxyType {
     ) -> Result<RoxyType, RoxyError> {
         match self {
             RoxyType::RoxyFunction(roxy_fn) => {
-                let mut fn_env = Box::new(Environment::new_with_enclosing(closure));
-
-                // println!("------------");
-                // println!("Call: {:?}", roxy_fn.name);
-                // println!("Global: {:?}", interpreter.globals);
-                // println!("Current: {:?}", interpreter.environment);
-                // println!("------------");
+                let mut fn_env;
+                if roxy_fn.is_method {
+                    fn_env = roxy_fn.closure.clone();
+                } else {
+                    println!("Closure: {:?}", closure);
+                    fn_env = Box::new(Environment::new_with_enclosing(closure));
+                }
 
                 for (i, param) in roxy_fn.params.iter().enumerate() {
                     // Here arguments vector is directly accessed because we can guarantee it won't overflow or underflow as that check is already in interpreter
-                    fn_env.define(param.lexeme.clone(), arguments[i].clone());
+                    fn_env.define(
+                        param.lexeme.clone(),
+                        arguments[i].clone(),
+                        Some(&mut interpreter.globals),
+                    );
                 }
 
                 let ret_value;
@@ -53,6 +58,12 @@ impl Callable for RoxyType {
             }
             //TODO: Implement for NativeFunction
             RoxyType::NativeFunction(_) => Ok(self.to_owned()),
+            RoxyType::RoxyClass(roxy_class) => {
+                return Ok(RoxyType::RoxyInstance(RoxyInstance {
+                    klass: roxy_class.to_owned(),
+                    fields: HashMap::new(),
+                }));
+            }
             _ => Err(RoxyError::InterpreterError(
                 InterpreterError::CanOnlyCallFunctionsAndClasses(token),
             )),
@@ -63,6 +74,7 @@ impl Callable for RoxyType {
         match self {
             //IMP-TODO: Change this
             RoxyType::RoxyFunction(roxy_fn) => Ok(roxy_fn.arity),
+            RoxyType::RoxyClass(_) => Ok(0),
             RoxyType::NativeFunction(native_fn) => Ok(native_fn.arity),
             _ => Err(RoxyError::InterpreterError(
                 //TODO: Do we need to make a new error over here or it's okay

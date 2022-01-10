@@ -3,3 +3,5 @@
 This style, called currying, after Haskell Curry (the same guy whose first name graces that other well-known functional language), is baked directly into the language syntax so it’s not as weird looking as it would be here.
 
 - Richard P. Gabriel and Kent Pitman coined the terms “Lisp-1” to refer to languages like Scheme that put functions and variables in the same namespace, and “Lisp-2” for languages like Common Lisp that partition them. Despite being totally opaque, those names have since stuck. Lox is a Lisp-1.
+
+- Lisp is a functional expression based language.

@@ -1,3 +1,4 @@
+//Should error out
 fun scope(a) {
   var a = "local";
 }

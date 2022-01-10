@@ -12,7 +12,9 @@ use crate::{RoxyType, TryConversion};
 // program        → declaration* EOF ;
 // declaration    → funDecl
 //                | varDecl
+//                | classDecl
 //                | statement ;
+// classDecl      → "class" IDENTIFIER "{" function* "}" ;
 // funDecl        → "fun" function ;
 // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 // function       → IDENTIFIER "(" parameters? ")" block ;
@@ -35,7 +37,7 @@ use crate::{RoxyType, TryConversion};
 // exprStmt       → expression ";" ;
 // printStmt      → "print" expression ";" ;
 // expression     → assignment ;
-// assignment     → IDENTIFIER "=" assignment
+// assignment     → ( call "." )? IDENTIFIER "=" assignment
 //                | logic_or ;
 // logic_or       → logic_and ( "or" logic_and )* ;
 // logic_and      → equality ( "and" equality )* ;
@@ -44,9 +46,9 @@ use crate::{RoxyType, TryConversion};
 // term           → factor ( ( "-" | "+" ) factor )* ;
 // factor         → unary ( ( "/" | "*" ) unary )* ;
 // unary          → ( "!" | "-" ) unary | call ;
-// call           → primary ( "(" arguments? ")" )* ;
+// call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
 // arguments      → expression ( "," expression )* ;
-// primary        → NUMBER | STRING | "true" | "false" | "nil"
+// primary        → NUMBER | STRING | "true" | "false" | "nil" | this
 //                | "(" expression ")" | IDENTIFIER ;
 
 // TODO: Think about how to add this too
@@ -224,6 +226,11 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Result<Stmt, RoxyError> {
+        let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Class])?;
+        if matched {
+            return self.class_decl(visited_token, "class".into());
+        }
+
         let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Fun])?;
         if matched {
             return self.function(visited_token, String::from("function"));
@@ -237,12 +244,58 @@ impl Parser {
         return self.statement();
     }
 
+    fn class_decl(&mut self, token: Token, kind: String) -> Result<Stmt, RoxyError> {
+        let mut last_visited_token = token;
+
+        let name = self.consume(
+            &TokenType::Identifier,
+            RoxyError::ParserError(ParserError::ExpectedIdentifier(
+                kind,
+                "after class name".into(),
+                last_visited_token.clone(),
+            )),
+        )?;
+
+        self.consume(
+            &TokenType::LeftBrace,
+            RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
+                "{".into(),
+                "class name".into(),
+                last_visited_token,
+            )),
+        )?;
+
+        let mut methods = vec![];
+        loop {
+            let (token, matched) = self.check(&TokenType::RightBrace)?;
+            last_visited_token = token;
+            if matched || self.is_at_end() {
+                break;
+            }
+
+            let func_stmt = self.function(last_visited_token, "method".into())?;
+            if let Stmt::Function(function) = func_stmt {
+                methods.push(function);
+            }
+        }
+
+        self.consume(
+            &TokenType::RightBrace,
+            RoxyError::ParserError(ParserError::ExpectedRightBraceAfterBlock(
+                last_visited_token,
+            )),
+        )?;
+
+        return Ok(Stmt::Class(Class { name, methods }));
+    }
+
     fn function(&mut self, token: Token, kind: String) -> Result<Stmt, RoxyError> {
         let mut last_visited_token = token;
         let name = self.consume(
             &TokenType::Identifier,
-            RoxyError::ParserError(ParserError::ExpectedIndetifier(
-                kind,
+            RoxyError::ParserError(ParserError::ExpectedIdentifier(
+                kind.clone(),
+                format!("after {:?} name", kind),
                 last_visited_token.clone(),
             )),
         )?;
@@ -585,6 +638,7 @@ impl Parser {
 
         let (visited_token, matched) = self.does_any_token_type_match(&vec![TokenType::Equal])?;
         last_visited_token = visited_token;
+
         if matched {
             match self.previous() {
                 Some(prev) => {
@@ -599,6 +653,16 @@ impl Parser {
                                 last_visited_token,
                                 Expr::Assign(Assign {
                                     name,
+                                    value: Box::new(value),
+                                }),
+                            ));
+                        }
+                        Expr::Get(get) => {
+                            return Ok((
+                                last_visited_token,
+                                Expr::Set(Set {
+                                    object: get.object,
+                                    name: get.name,
                                     value: Box::new(value),
                                 }),
                             ));
@@ -700,15 +764,34 @@ impl Parser {
         let (_, mut expr) = self.primary()?;
 
         loop {
-            let (visited_token, matched) =
+            let (_, matched_left_paren) =
                 self.does_any_token_type_match(&vec![TokenType::LeftParen])?;
+
+            let (visited_token, matched_dot) =
+                self.does_any_token_type_match(&vec![TokenType::Dot])?;
             last_visited_token = visited_token;
-            if !matched {
+            if !matched_left_paren && !matched_dot {
                 break;
             }
 
-            let (_, finish_call_expr) = self.finish_call(&expr)?;
-            expr = finish_call_expr;
+            if matched_left_paren {
+                let (_, finish_call_expr) = self.finish_call(&expr)?;
+                expr = finish_call_expr;
+            } else if matched_dot {
+                let name = self.consume(
+                    &TokenType::Identifier,
+                    RoxyError::ParserError(ParserError::ExpectedIdentifier(
+                        ".".into(),
+                        "after property".into(),
+                        last_visited_token,
+                    )),
+                )?;
+
+                expr = Expr::Get(Get {
+                    object: Box::new(expr),
+                    name,
+                })
+            }
         }
 
         return Ok((last_visited_token, expr));
@@ -793,6 +876,12 @@ impl Parser {
             return Ok((token, expr));
         }
 
+        if let (token, Some(expr)) =
+            self.match_token_types_and_create_literal(&vec![TokenType::This])?
+        {
+            return Ok((token, expr));
+        }
+
         let (token, matched) = self.does_any_token_type_match(&vec![TokenType::LeftParen])?;
         if matched {
             let (_, expr) = self.expression()?;
@@ -860,6 +949,7 @@ impl Parser {
                             value: RoxyType::NULL,
                         })),
                     )),
+                    TokenType::This => Ok((token, Some(Expr::This(This { keyword: prev })))),
                     TokenType::Identifier => {
                         Ok((token, Some(Expr::Variable(Variable { name: prev }))))
                     }

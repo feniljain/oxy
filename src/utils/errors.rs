@@ -6,6 +6,7 @@ pub enum RoxyError {
     ParserError(ParserError),
     InterpreterError(InterpreterError),
     EnvironmentError(EnvironmentError),
+    ResolutionError(ResolutionError),
     InternalError(InternalError),
     FileDoesNotExist,
 }
@@ -19,6 +20,7 @@ impl std::fmt::Display for RoxyError {
             RoxyError::ParserError(err) => write!(f, "{:?}", err),
             RoxyError::InterpreterError(err) => write!(f, "{:?}", err),
             RoxyError::EnvironmentError(err) => write!(f, "{:?}", err),
+            RoxyError::ResolutionError(err) => write!(f, "{:?}", err),
             RoxyError::InternalError(err) => write!(f, "{:?}", err),
             RoxyError::FileDoesNotExist => write!(f, "File does not exist"),
         }
@@ -35,6 +37,8 @@ pub enum InterpreterError {
     ExpectednArgsGotmArgs(usize, usize, Token),
     DivideByZeroError(Token),
     CanOnlyCallFunctionsAndClasses(Token),
+    OnlyInstancesHaveKeyword(String, Token),
+    UndefinedProperty(Token),
 }
 
 impl std::fmt::Display for InterpreterError {
@@ -96,6 +100,20 @@ impl std::fmt::Display for InterpreterError {
                     token.line, n, m,
                 )
             }
+            InterpreterError::OnlyInstancesHaveKeyword(keyword, token) => {
+                write!(
+                    f,
+                    "[line: {:?}] InterpreterError: Only Instances are expected to have {:?}: {:?}",
+                    token.line, keyword, token.lexeme
+                )
+            }
+            InterpreterError::UndefinedProperty(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] InterpreterError: Undefined Property: {:?}",
+                    token.line, token.lexeme,
+                )
+            }
         }
     }
 }
@@ -127,7 +145,7 @@ pub enum ParserError {
     ExpectedRightParen(Token),
     ExpectedExpression(Token),
     ExpectedSemicolon(Token),
-    ExpectedIndetifier(String, Token),
+    ExpectedIdentifier(String, String, Token),
     ExpectedVariableName(Token),
     ExpectedParameterName(Token),
     ExpectedRightBraceAfterBlock(Token),
@@ -175,10 +193,10 @@ impl std::fmt::Display for ParserError {
                 "[line: {:?}] ParserError: Expected semicolon: {:?}",
                 token.line, token.lexeme
             ),
-            ParserError::ExpectedIndetifier(kind, token) => write!(
+            ParserError::ExpectedIdentifier(kind, kw, token) => write!(
                 f,
-                "[line: {:?}] ParserError: Expected {:?} name: {:?}",
-                token.line, kind, token.lexeme
+                "[line: {:?}] ParserError: Expected {:?} {:?}: {:?}",
+                token.line, kind, kw, token.lexeme
             ),
             ParserError::ExpectedVariableName(token) => write!(
                 f,
@@ -222,6 +240,7 @@ impl std::fmt::Display for ParserError {
 #[derive(Debug, Clone)]
 pub enum EnvironmentError {
     UndefinedVariable(String),
+    EnvironmentDoesNotExistAtGivenDistance,
 }
 
 impl std::fmt::Display for EnvironmentError {
@@ -229,6 +248,55 @@ impl std::fmt::Display for EnvironmentError {
         match self {
             EnvironmentError::UndefinedVariable(var_name) => {
                 write!(f, "EnvironmentError: Undefined variable: {:?}.", var_name)
+            }
+            EnvironmentError::EnvironmentDoesNotExistAtGivenDistance => {
+                write!(
+                    f,
+                    "EnvironmentError: Environment Does Not Exist At Given Distance"
+                )
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ResolutionError {
+    CantReadLocalVariableInItsOwnInitializer(Token),
+    InvalidScopeAccess(Token),
+    AlreadyAVariableWithThisNameInThisScope(Token),
+    CantReturnFromTopLevelCode(Token),
+}
+
+impl std::fmt::Display for ResolutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            ResolutionError::CantReadLocalVariableInItsOwnInitializer(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] ResolutionError: Cant read local varaiable in its own initializer: {:?}",
+                    token.line, token.lexeme
+                )
+            }
+            ResolutionError::InvalidScopeAccess(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] ResolutionError: Invalid Scope Access: {:?}",
+                    token.line, token.lexeme
+                )
+            }
+            ResolutionError::AlreadyAVariableWithThisNameInThisScope(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] ResolutionError: A variable with same name already exists in the scope: {:?}",
+                    token.line, token.lexeme
+                )
+            }
+            ResolutionError::CantReturnFromTopLevelCode(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] ResolutionError: Can't return from top level code: {:?}",
+                    token.line, token.lexeme
+                )
             }
         }
     }

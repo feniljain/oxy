@@ -3,6 +3,7 @@ pub mod environment;
 pub mod expr;
 pub mod interpreter;
 pub mod parser;
+pub mod resolver;
 pub mod scanner;
 pub mod tokens;
 pub mod utils;
@@ -11,6 +12,8 @@ use core::fmt::Debug;
 use environment::Environment;
 use expr::Stmt;
 use parser::Parser;
+use resolver::Resolver;
+use std::collections::HashMap;
 use std::fmt::{self, Formatter};
 use tokens::TokenType;
 
@@ -21,8 +24,9 @@ use std::{env::args, fs, process::exit};
 use utils::errors::{InterpreterError, RoxyError};
 
 // TODO: Write tests for every component
+// TODO: Remove all unnecessary comments
 
-//TODO: Move all these into a separate file
+//TODO: Move all these into a separate file(most probably interpreter.rs)
 #[derive(Debug, Clone)]
 pub enum RoxyType {
     String(String),
@@ -32,6 +36,8 @@ pub enum RoxyType {
     Object,
     RoxyFunction(RoxyFunction),
     NativeFunction(NativeFunction),
+    RoxyClass(RoxyClass),
+    RoxyInstance(RoxyInstance),
 }
 
 //TODO: Implement Debug properly for both functions
@@ -63,27 +69,72 @@ impl std::fmt::Display for NativeFunction {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RoxyFunction {
     pub name: String,
     pub arity: usize,
     pub params: Vec<Token>,
     pub body: Vec<Stmt>,
     pub closure: Box<Environment>,
+    pub is_method: bool,
 }
 
-impl Debug for RoxyFunction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("RoxyFunction")
-            .field("name", &self.name)
-            .field("arity", &self.arity)
-            .finish()
+impl RoxyFunction {
+    pub fn bind(&self, instance: &RoxyInstance) -> RoxyFunction {
+        let mut env = Environment::new_with_enclosing(self.closure.clone());
+        env.define(
+            "this".into(),
+            RoxyType::RoxyInstance(instance.to_owned()),
+            None,
+        );
+
+        return RoxyFunction {
+            name: self.name.clone(),
+            arity: self.arity,
+            params: self.params.clone(),
+            body: self.body.clone(),
+            closure: Box::new(env),
+            is_method: true,
+        };
     }
 }
 
-impl std::fmt::Display for RoxyFunction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "<{:?}>", self.name)
+#[derive(Clone, Debug)]
+pub struct RoxyClass {
+    pub name: String,
+    pub methods: HashMap<String, RoxyFunction>,
+}
+
+impl RoxyClass {
+    pub fn find_method(&self, name: String) -> Option<&RoxyFunction> {
+        return self.methods.get(&name);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct RoxyInstance {
+    pub klass: RoxyClass,
+    pub fields: HashMap<String, RoxyType>,
+}
+
+impl RoxyInstance {
+    pub fn get(&mut self, name: Token) -> Result<RoxyType, RoxyError> {
+        if let Some(value) = self.fields.get(&name.lexeme) {
+            return Ok(value.to_owned());
+        }
+
+        if let Some(method) = self.klass.find_method(name.lexeme.clone()) {
+            let res = method.bind(&self);
+            return Ok(RoxyType::RoxyFunction(res));
+        }
+
+        return Err(RoxyError::InterpreterError(
+            InterpreterError::UndefinedProperty(name),
+        ));
+    }
+
+    pub fn set(&mut self, name: Token, value: RoxyType) {
+        self.fields.insert(name.lexeme, value);
     }
 }
 
@@ -114,6 +165,10 @@ impl std::fmt::Display for RoxyType {
             RoxyType::Object => write!(f, "object"),
             RoxyType::RoxyFunction(_) => write!(f, "RoxyFunction"),
             RoxyType::NativeFunction(_) => write!(f, "NativeFunction"),
+            RoxyType::RoxyClass(_) => write!(f, "RoxyClass"),
+            RoxyType::RoxyInstance(roxy_instance) => {
+                write!(f, "{:?} instance", roxy_instance.klass.name)
+            }
         }
     }
 }
@@ -281,23 +336,23 @@ impl CliHandler {
 
         let mut parser = Parser::new(tokens.clone());
         match parser.parse() {
-            Ok(stmts_opt) => {
-                match stmts_opt {
-                    Some(stmts) => {
-                        // println!("Parsing Successful: {:?}", stmts);
-                        let mut interpreter = Interpreter::new();
-                        for stmt in stmts {
-                            interpreter.interpret(stmt)?;
-                        }
-                    }
-                    None => {
-                        println!("Parsing Statement Unsuccessful");
-                        for parsing_error in parser.errors {
-                            println!("{:?}", parsing_error);
-                        }
+            Ok(stmts_opt) => match stmts_opt {
+                Some(stmts) => {
+                    // println!("Parsing Successful: {:?}", stmts);
+                    let mut interpreter = Interpreter::new();
+                    let mut resolver = Resolver::new(&mut interpreter);
+                    resolver.resolve(stmts.clone())?;
+                    for stmt in stmts {
+                        interpreter.interpret(stmt)?;
                     }
                 }
-            }
+                None => {
+                    println!("Parsing Statement Unsuccessful");
+                    for parsing_error in parser.errors {
+                        println!("{:?}", parsing_error);
+                    }
+                }
+            },
             Err(err) => {
                 println!("Parsing Statement Unsuccessful Critical Error");
                 return Err(err);

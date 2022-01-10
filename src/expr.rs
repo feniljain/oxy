@@ -155,7 +155,7 @@ pub struct Block {
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: Token,
-    pub superclass: Variable,
+    // pub superclass: Variable,
     pub methods: Vec<Function>,
 }
 
