@@ -1,5 +1,6 @@
 // use crate::expr::{ExpressionStmt, Grouping, Literal, Print, Stmt, Unary};
 use crate::expr::*;
+use crate::utils::errors::InterpreterError;
 use crate::{
     expr::{Binary, Expr},
     tokens::TokenType,
@@ -14,7 +15,7 @@ use crate::{RoxyType, TryConversion};
 //                | varDecl
 //                | classDecl
 //                | statement ;
-// classDecl      → "class" IDENTIFIER "{" function* "}" ;
+// classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;
 // funDecl        → "fun" function ;
 // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 // function       → IDENTIFIER "(" parameters? ")" block ;
@@ -48,8 +49,9 @@ use crate::{RoxyType, TryConversion};
 // unary          → ( "!" | "-" ) unary | call ;
 // call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
 // arguments      → expression ( "," expression )* ;
-// primary        → NUMBER | STRING | "true" | "false" | "nil" | this
-//                | "(" expression ")" | IDENTIFIER ;
+// primary        →  "true" | "false" | "nil" | "this"
+//                  | NUMBER | STRING | IDENTIFIER | "(" expression ")" ;
+//                  | "super" "." IDENTIFIER ;
 
 // TODO: Think about how to add this too
 //, -> C
@@ -256,6 +258,22 @@ impl Parser {
             )),
         )?;
 
+        let mut superclass = None;
+        let (token, matched) = self.does_any_token_type_match(&vec![TokenType::Less])?;
+        last_visited_token = token;
+        if matched {
+            let superclass_name = self.consume(
+                &TokenType::Identifier,
+                RoxyError::ParserError(ParserError::ExpectedSuperclassName(
+                    last_visited_token.clone(),
+                )),
+            )?;
+
+            superclass = Some(Variable {
+                name: superclass_name.clone(),
+            });
+        }
+
         self.consume(
             &TokenType::LeftBrace,
             RoxyError::ParserError(ParserError::ExpectedPunctAfterKeyword(
@@ -286,7 +304,11 @@ impl Parser {
             )),
         )?;
 
-        return Ok(Stmt::Class(Class { name, methods }));
+        return Ok(Stmt::Class(Class {
+            name,
+            methods,
+            superclass,
+        }));
     }
 
     fn function(&mut self, token: Token, kind: String) -> Result<Stmt, RoxyError> {
@@ -870,14 +892,40 @@ impl Parser {
             return Ok((token, expr));
         }
 
+        if let (token, Some(_)) =
+            self.match_token_types_and_create_literal(&vec![TokenType::Super])?
+        {
+            let super_kw = token;
+
+            let token = self.consume(
+                &TokenType::Dot,
+                RoxyError::InterpreterError(InterpreterError::ExpectedDotAfterSuper(
+                    super_kw.clone(),
+                )),
+            )?;
+
+            let method = self.consume(
+                &TokenType::Identifier,
+                RoxyError::InterpreterError(InterpreterError::ExpectedSuperclassMethodName(token)),
+            )?;
+
+            return Ok((
+                method.clone(),
+                Expr::Super(Super {
+                    keyword: super_kw,
+                    method,
+                }),
+            ));
+        }
+
         if let (token, Some(expr)) =
-            self.match_token_types_and_create_literal(&vec![TokenType::Identifier])?
+            self.match_token_types_and_create_literal(&vec![TokenType::This])?
         {
             return Ok((token, expr));
         }
 
         if let (token, Some(expr)) =
-            self.match_token_types_and_create_literal(&vec![TokenType::This])?
+            self.match_token_types_and_create_literal(&vec![TokenType::Identifier])?
         {
             return Ok((token, expr));
         }
@@ -950,6 +998,7 @@ impl Parser {
                         })),
                     )),
                     TokenType::This => Ok((token, Some(Expr::This(This { keyword: prev })))),
+                    TokenType::Super => Ok((token, Some(Expr::This(This { keyword: prev })))),
                     TokenType::Identifier => {
                         Ok((token, Some(Expr::Variable(Variable { name: prev }))))
                     }

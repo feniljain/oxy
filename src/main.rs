@@ -75,13 +75,15 @@ pub struct RoxyFunction {
     pub arity: usize,
     pub params: Vec<Token>,
     pub body: Vec<Stmt>,
-    pub closure: Box<Environment>,
+    pub closure: Option<Box<Environment>>,
     pub is_method: bool,
+    pub is_initializer: bool,
 }
 
 impl RoxyFunction {
     pub fn bind(&self, instance: &RoxyInstance) -> RoxyFunction {
-        let mut env = Environment::new_with_enclosing(self.closure.clone());
+        println!("Closure: {:?}", self.closure);
+        let mut env = Environment::new_with_enclosing(self.closure.clone().unwrap());
         env.define(
             "this".into(),
             RoxyType::RoxyInstance(instance.to_owned()),
@@ -93,8 +95,9 @@ impl RoxyFunction {
             arity: self.arity,
             params: self.params.clone(),
             body: self.body.clone(),
-            closure: Box::new(env),
+            closure: Some(Box::new(env)),
             is_method: true,
+            is_initializer: self.is_initializer,
         };
     }
 }
@@ -103,11 +106,21 @@ impl RoxyFunction {
 pub struct RoxyClass {
     pub name: String,
     pub methods: HashMap<String, RoxyFunction>,
+    pub superclass: Option<Box<RoxyClass>>,
 }
 
 impl RoxyClass {
     pub fn find_method(&self, name: String) -> Option<&RoxyFunction> {
-        return self.methods.get(&name);
+        let local_method_search_opt = self.methods.get(&name);
+        if local_method_search_opt.is_some() {
+            return local_method_search_opt;
+        } else {
+            if let Some(superclass) = &self.superclass {
+                return superclass.find_method(name);
+            }
+
+            return None;
+        }
     }
 }
 

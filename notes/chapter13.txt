@@ -1,0 +1,12 @@
+- Inheritance appears in object-oriented languages all the way back to the first one, Simula. Early on, Kristen Nygaard and Ole-Johan Dahl noticed commonalities across classes in the simulation programs they wrote. Inheritance gave them a way to reuse the code for those similar parts.
+
+- “Super-” and “sub-” mean “above” and “below” in Latin, respectively. Picture an inheritance tree like a family tree with the root at the top—subclasses are below their superclasses on the diagram. More generally, “sub-” refers to things that refine or are contained by some more general concept. In zoology, a subclass is a finer categorization of a larger class of living things.
+
+In set theory, a subset is contained by a larger superset which has all of the elements of the subset and possibly more. Set theory and programming languages meet each other in type theory. There, you have “supertypes” and “subtypes”.
+
+In statically typed object-oriented languages, a subclass is also often a subtype of its superclass. Say we have a Doughnut superclass and a BostonCream subclass. Every BostonCream is also an instance of Doughnut, but there may be doughnut objects that are not BostonCreams (like Crullers).
+
+Think of a type as the set of all values of that type. The set of all Doughnut instances contains the set of all BostonCream instances since every BostonCream is also a Doughnut. So BostonCream is a subclass, and a subtype, and its instances are a subset. It all lines up.
+
+- https://en.wikipedia.org/wiki/Liskov_substitution_principle
+- https://en.wikipedia.org/wiki/Semantics_(computer_science)

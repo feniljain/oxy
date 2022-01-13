@@ -15,7 +15,15 @@ use crate::{
 pub enum FunctionType {
     None,
     Function,
+    Initializer,
     Method,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ClassType {
+    None,
+    Class,
+    Subclass,
 }
 
 pub struct Resolver<'a> {
@@ -23,6 +31,7 @@ pub struct Resolver<'a> {
     //We have use this as a stack
     scopes: Vec<HashMap<String, bool>>,
     curr_func_type: FunctionType,
+    curr_class_type: ClassType,
 }
 
 impl<'a> Resolver<'a> {
@@ -31,6 +40,7 @@ impl<'a> Resolver<'a> {
             interpreter,
             scopes: vec![],
             curr_func_type: FunctionType::None,
+            curr_class_type: ClassType::None,
         }
     }
 
@@ -104,8 +114,28 @@ impl<'a> Resolver<'a> {
                 self.resolve_expr(*set_expr.value)?;
                 self.resolve_expr(*set_expr.object)?;
             }
-            Expr::Super(_) => todo!(),
+            Expr::Super(super_expr) => match self.curr_class_type {
+                ClassType::None => {
+                    return Err(RoxyError::ResolutionError(
+                        ResolutionError::CantUseSuperInAClassWithNoSuperclass(super_expr.keyword),
+                    ))
+                }
+                ClassType::Class => {
+                    return Err(RoxyError::ResolutionError(
+                        ResolutionError::CantUseSuperInAClassWithNoSuperclass(super_expr.keyword),
+                    ))
+                }
+                ClassType::Subclass => {
+                    self.resolve_local(Expr::Super(super_expr.clone()), super_expr.keyword)?;
+                }
+            },
             Expr::This(ref this_expr) => {
+                if ClassType::None == self.curr_class_type {
+                    return Err(RoxyError::ResolutionError(
+                        ResolutionError::CantUseThisOutsideOfAClass(this_expr.keyword.clone()),
+                    ));
+                }
+
                 self.resolve_local(expr.clone(), this_expr.keyword.clone())?;
             }
             Expr::Unary(unary_expr) => {
@@ -167,7 +197,28 @@ impl<'a> Resolver<'a> {
             Stmt::Class(class_stmt) => {
                 self.declare_or_define(class_stmt.name.clone(), false)?;
 
-                self.begin_scope();
+                self.curr_class_type = ClassType::Class;
+                if let Some(superclass) = &class_stmt.superclass {
+                    if class_stmt.name.lexeme.eq(&superclass.name.lexeme) {
+                        return Err(RoxyError::ResolutionError(
+                            ResolutionError::AClassCantInheritFromItself(superclass.name.clone()),
+                        ));
+                    }
+
+                    self.begin_scope();
+
+                    self.curr_class_type = ClassType::Subclass;
+                    self.resolve_expr(Expr::Variable(superclass.clone()))?;
+                    self.begin_scope();
+                    if !self.scopes.is_empty() {
+                        let len = self.scopes.len();
+                        let scope_opt = self.scopes.get_mut(len - 1);
+                        if let Some(scope) = scope_opt {
+                            scope.insert("super".into(), true);
+                        }
+                    }
+                }
+
                 if !self.scopes.is_empty() {
                     let len = self.scopes.len();
                     let scope_opt = self.scopes.get_mut(len - 1);
@@ -176,11 +227,22 @@ impl<'a> Resolver<'a> {
                     }
                 }
                 for method in class_stmt.methods {
-                    self.resolve_func(method, FunctionType::Method)?;
+                    let mut declaration = FunctionType::Method;
+                    if method.name.lexeme.eq("init") {
+                        declaration = FunctionType::Initializer;
+                    }
+
+                    self.resolve_func(method, declaration)?;
                 }
                 self.declare_or_define(class_stmt.name, true)?;
 
                 self.end_scope();
+
+                if class_stmt.superclass.is_some() {
+                    self.end_scope();
+                }
+
+                self.curr_class_type = ClassType::None;
             }
             Stmt::Expression(expr_stmt) => self.resolve_expr(expr_stmt.expression)?,
             Stmt::Function(func_stmt) => {
@@ -215,6 +277,12 @@ impl<'a> Resolver<'a> {
                 }
 
                 if let Some(value) = return_stmt.value {
+                    if self.curr_func_type == FunctionType::Initializer {
+                        return Err(RoxyError::ResolutionError(
+                            ResolutionError::CantReturnAValueFromAnInitializer(return_stmt.keyword),
+                        ));
+                    }
+
                     self.resolve_expr(value)?;
                 }
             }

@@ -39,6 +39,10 @@ pub enum InterpreterError {
     CanOnlyCallFunctionsAndClasses(Token),
     OnlyInstancesHaveKeyword(String, Token),
     UndefinedProperty(Token),
+    SuperclassMustBeAClass(Token),
+    ExpectedDotAfterSuper(Token),
+    ExpectedSuperclassMethodName(Token),
+    ExpectedRoxyClass,
 }
 
 impl std::fmt::Display for InterpreterError {
@@ -114,6 +118,26 @@ impl std::fmt::Display for InterpreterError {
                     token.line, token.lexeme,
                 )
             }
+            InterpreterError::SuperclassMustBeAClass(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] InterpreterError: Superclass must be a class: {:?}",
+                    token.line, token.lexeme,
+                )
+            }
+            InterpreterError::ExpectedDotAfterSuper(token) => write!(
+                f,
+                "[line: {:?}] InterpreterError: Expected '.' after 'super': {:?}",
+                token.line, token.lexeme
+            ),
+            InterpreterError::ExpectedSuperclassMethodName(token) => write!(
+                f,
+                "[line: {:?}] InterpreterError: Expected super class method name: {:?}",
+                token.line, token.lexeme
+            ),
+            InterpreterError::ExpectedRoxyClass => {
+                write!(f, "InterpreterError: Expected roxy class")
+            }
         }
     }
 }
@@ -146,6 +170,7 @@ pub enum ParserError {
     ExpectedExpression(Token),
     ExpectedSemicolon(Token),
     ExpectedIdentifier(String, String, Token),
+    ExpectedSuperclassName(Token),
     ExpectedVariableName(Token),
     ExpectedParameterName(Token),
     ExpectedRightBraceAfterBlock(Token),
@@ -201,6 +226,11 @@ impl std::fmt::Display for ParserError {
             ParserError::ExpectedVariableName(token) => write!(
                 f,
                 "[line: {:?}] ParserError: Expected variable name: {:?}",
+                token.line, token.lexeme
+            ),
+            ParserError::ExpectedSuperclassName(token) => write!(
+                f,
+                "[line: {:?}] ParserError: Expected super class name: {:?}",
                 token.line, token.lexeme
             ),
             ParserError::ExpectedParameterName(token) => write!(
@@ -265,6 +295,11 @@ pub enum ResolutionError {
     InvalidScopeAccess(Token),
     AlreadyAVariableWithThisNameInThisScope(Token),
     CantReturnFromTopLevelCode(Token),
+    CantUseThisOutsideOfAClass(Token),
+    CantReturnAValueFromAnInitializer(Token),
+    AClassCantInheritFromItself(Token),
+    CantUseSuperOutsideClass(Token),
+    CantUseSuperInAClassWithNoSuperclass(Token),
 }
 
 impl std::fmt::Display for ResolutionError {
@@ -295,6 +330,41 @@ impl std::fmt::Display for ResolutionError {
                 write!(
                     f,
                     "[line: {:?}] ResolutionError: Can't return from top level code: {:?}",
+                    token.line, token.lexeme
+                )
+            }
+            ResolutionError::CantUseThisOutsideOfAClass(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] ResolutionError: Can't use 'this' outside of a class: {:?}",
+                    token.line, token.lexeme
+                )
+            }
+            ResolutionError::CantReturnAValueFromAnInitializer(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] ResolutionError: Can't return a value from an initializer: {:?}",
+                    token.line, token.lexeme
+                )
+            }
+            ResolutionError::AClassCantInheritFromItself(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] ResolutionError: A class can't inherit from itself: {:?}",
+                    token.line, token.lexeme
+                )
+            }
+            ResolutionError::CantUseSuperOutsideClass(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] ResolutionError: Can't use super outside class: {:?}",
+                    token.line, token.lexeme
+                )
+            }
+            ResolutionError::CantUseSuperInAClassWithNoSuperclass(token) => {
+                write!(
+                    f,
+                    "[line: {:?}] ResolutionError: Can't use super in a class with no superclass: {:?}",
                     token.line, token.lexeme
                 )
             }

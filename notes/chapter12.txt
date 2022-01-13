@@ -19,3 +19,17 @@ Difference between multimethods and method overloading: https://stackoverflow.co
 - Fields vs properties: Fields are named bits of state stored directly in an instance. Properties are the named, uh, things, that a get expression may return.
 
 - “i” for loop variables predates OOP and goes all the way back to Fortran.
+
+- We language nerds have a tendency to fetishize minimalism. Personally, I think simplicity is only part of the equation. What we really want to give the user is power, which I define as:
+
+power = breadth × ease ÷ complexity
+
+None of these are precise numeric measures. I’m using math as analogy here, not actual quantification.
+
+    Breadth is the range of different things the language lets you express. C has a lot of breadth—it’s been used for everything from operating systems to user applications to games. Domain-specific languages like AppleScript and Matlab have less breadth.
+
+    Ease is how little effort it takes to make the language do what you want. “Usability” might be another term, though it carries more baggage than I want to bring in. “Higher-level” languages tend to have more ease than “lower-level” ones. Most languages have a “grain” to them where some things feel easier to express than others.
+
+    Complexity is how big the language (including its runtime, core libraries, tools, ecosystem, etc.) is. People talk about how many pages are in a language’s spec, or how many keywords it has. It’s how much the user has to load into their wetware before they can be productive in the system. It is the antonym of simplicity.
+
+Reducing complexity does increase power. The smaller the denominator, the larger the resulting value, so our intuition that simplicity is good is valid. However, when reducing complexity, we must take care not to sacrifice breadth or ease in the process, or the total power may go down. Java would be a strictly simpler language if it removed strings, but it probably wouldn’t handle text manipulation tasks well, nor would it be as easy to get things done.

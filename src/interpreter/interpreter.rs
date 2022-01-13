@@ -12,6 +12,7 @@ pub struct Interpreter {
     //TODO: Make this private
     pub environment: Box<Environment>,
     locals: HashMap<String, usize>,
+    inside_function: bool,
 }
 
 impl Interpreter {
@@ -206,9 +207,33 @@ impl Interpreter {
                     ),
                 ));
             }
-            Expr::Super(_) => todo!(),
+            Expr::Super(super_expr) => {
+                let distance = self.locals[&Expr::Super(super_expr.to_owned()).to_string()];
+                let superclass = self.environment.get_at(distance, "super".into())?;
+                let object = self.environment.get_at(distance - 1, "this".into())?;
+
+                if let RoxyType::RoxyClass(superclass) = superclass {
+                    if let Some(method) = superclass.find_method(super_expr.method.lexeme.clone()) {
+                        match object {
+                            RoxyType::RoxyInstance(instance) => {
+                                return Ok(RoxyType::RoxyFunction(method.bind(&instance)));
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+
+                    return Err(RoxyError::InterpreterError(
+                        InterpreterError::UndefinedProperty(super_expr.method.clone()),
+                    ));
+                }
+
+                return Err(RoxyError::InterpreterError(
+                    InterpreterError::ExpectedRoxyClass,
+                ));
+            }
             Expr::This(this_expr) => {
-                return self.look_up_variable(this_expr.keyword.clone(), expr.clone());
+                return self.environment.get(this_expr.keyword.lexeme.clone());
+                // return self.look_up_variable(this_expr.keyword.clone(), expr.clone());
             }
             Expr::Unary(expr) => {
                 let right = self.evaluate(&expr.right)?;
@@ -250,14 +275,21 @@ impl Interpreter {
         env: Box<Environment>,
     ) -> Result<Option<RoxyType>, RoxyError> {
         self.environment = env;
+        // println!("Env at start: {:?}", self.environment);
 
-        for stmt in stmts {
-            if let Some(value) = self.interpret(stmt)? {
+        for stmt in stmts.clone() {
+            //TODO: Remove clone from here
+            if let Some(value) = self.interpret(stmt.clone())? {
+                // println!("Stmt: {:?}", stmt);
+                // println!("Environment: {:?}", self.environment.enclosing);
                 self.environment = self.environment.clone().enclosing.unwrap();
                 return Ok(Some(value));
             }
+            println!("Stmt: {:?}", stmt);
+            println!("Environment: {:?}", self.environment.enclosing);
         }
 
+        // println!("Env at end: {:?}", self.environment);
         //TODO: Think how to remove this unwrap
         self.environment = self.environment.clone().enclosing.unwrap();
 
@@ -271,11 +303,37 @@ impl Interpreter {
                 return self.execute_block(block.statements, block_env);
             }
             Stmt::Class(class_stmt) => {
+                let mut superclass_opt = None;
+
                 self.environment.define(
                     class_stmt.name.lexeme.clone(),
                     RoxyType::NULL,
                     Some(&mut self.globals),
                 );
+
+                if let Some(superclass) = &class_stmt.superclass {
+                    let roxy_type = self.evaluate(&Expr::Variable(superclass.clone()))?;
+                    match roxy_type {
+                        RoxyType::RoxyClass(class) => {
+                            let mut superclass_env =
+                                Environment::new_with_enclosing(self.environment.clone());
+                            superclass_env.define(
+                                "super".into(),
+                                RoxyType::RoxyClass(class.clone()),
+                                Some(&mut self.globals),
+                            );
+
+                            self.environment = Box::new(superclass_env);
+
+                            superclass_opt = Some(Box::new(class));
+                        }
+                        _ => {
+                            return Err(RoxyError::InterpreterError(
+                                InterpreterError::SuperclassMustBeAClass(superclass.name.clone()),
+                            ));
+                        }
+                    }
+                }
 
                 // if let None = self.environment.enclosing {
                 //     self.globals
@@ -287,12 +345,13 @@ impl Interpreter {
                     methods.insert(
                         method.name.lexeme.clone(),
                         RoxyFunction {
-                            name: method.name.lexeme,
+                            name: method.name.lexeme.clone(),
                             arity: method.params.len(),
                             params: method.params,
                             body: method.body,
-                            closure: self.environment.clone(),
+                            closure: Some(self.environment.clone()),
                             is_method: true,
+                            is_initializer: (method.name.lexeme.eq("into")),
                         },
                     );
                 }
@@ -300,7 +359,12 @@ impl Interpreter {
                 let klass = RoxyType::RoxyClass(RoxyClass {
                     name: class_stmt.name.lexeme.clone(),
                     methods,
+                    superclass: superclass_opt,
                 });
+
+                if class_stmt.superclass.is_some() {
+                    self.environment = self.environment.enclosing.clone().unwrap();
+                }
 
                 self.environment.assign(
                     class_stmt.name.lexeme.clone(),
@@ -317,7 +381,13 @@ impl Interpreter {
             }
             // TODO: Implement anonymous functions
             Stmt::Function(function) => {
-                println!("Function: {:?}", &function.name);
+                let closure;
+                if self.inside_function {
+                    closure = Some(self.environment.clone());
+                } else {
+                    closure = None;
+                }
+
                 self.environment.define(
                     function.name.lexeme.clone(),
                     RoxyType::RoxyFunction(RoxyFunction {
@@ -325,8 +395,10 @@ impl Interpreter {
                         arity: function.params.len(),
                         params: function.params.clone(),
                         body: function.body.clone(),
-                        closure: self.environment.clone(),
+                        // closure: Some(self.environment.clone()),
+                        closure,
                         is_method: false,
+                        is_initializer: false,
                     }),
                     Some(&mut self.globals),
                 );
@@ -455,6 +527,7 @@ impl Interpreter {
             environment: Box::new(global_env.clone()),
             globals: Box::new(global_env),
             locals: HashMap::new(),
+            inside_function: false,
         };
     }
 
@@ -462,7 +535,11 @@ impl Interpreter {
         // let env_string =
         self.locals.insert(expr.to_string(), depth);
     }
+
+    pub fn set_is_calling(&mut self, inside_function: bool) {
+        self.inside_function = inside_function;
+    }
 }
 
-//challenge-chapter-8.rx
 //closure.rx
+//super_kw.rx
