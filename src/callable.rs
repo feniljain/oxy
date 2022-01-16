@@ -34,7 +34,6 @@ impl Callable for RoxyType {
                 if roxy_fn.is_initializer {
                     return closure.get_at(0, "this".into());
                 }
-                println!("=========");
 
                 let mut fn_env;
                 if roxy_fn.is_method {
@@ -53,7 +52,6 @@ impl Callable for RoxyType {
                     }
                 }
 
-                println!("{:?} {:?}", roxy_fn.name, fn_env);
                 for (i, param) in roxy_fn.params.iter().enumerate() {
                     // Here arguments vector is directly accessed because we can guarantee it won't overflow or underflow as that check is already in interpreter
                     fn_env.define(

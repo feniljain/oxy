@@ -82,7 +82,6 @@ pub struct RoxyFunction {
 
 impl RoxyFunction {
     pub fn bind(&self, instance: &RoxyInstance) -> RoxyFunction {
-        println!("Closure: {:?}", self.closure);
         let mut env = Environment::new_with_enclosing(self.closure.clone().unwrap());
         env.define(
             "this".into(),

@@ -1,0 +1,9 @@
+- https://stackoverflow.com/questions/3246803/why-use-ifndef-class-h-and-define-class-h-in-h-file-but-not-in-cpp
+- https://en.wikipedia.org/wiki/Amortized_analysis
+- Void pointer(void*) in C: https://www.geeksforgeeks.org/void-pointer-c-cpp/
+- malloc, free, realloc, reallocf, MALLOC_DEFINE ...: http://manpages.ubuntu.com/manpages/trusty/man9/realloc.9freebsd.html
+- https://stackoverflow.com/questions/2550774/what-is-size-t-in-c
+- https://stackoverflow.com/questions/25789644/difference-between-using-makefile-and-cmake-to-compile-the-code
+
+- Format specifier: %g: It is used to print the decimal floating-point values, and it uses the fixed precision, i.e., the value after the decimal in input would be exactly the same as the value in the output.
+- https://en.wikipedia.org/wiki/Run-length_encoding

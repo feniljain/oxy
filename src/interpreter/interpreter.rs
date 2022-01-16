@@ -275,21 +275,15 @@ impl Interpreter {
         env: Box<Environment>,
     ) -> Result<Option<RoxyType>, RoxyError> {
         self.environment = env;
-        // println!("Env at start: {:?}", self.environment);
 
         for stmt in stmts.clone() {
             //TODO: Remove clone from here
             if let Some(value) = self.interpret(stmt.clone())? {
-                // println!("Stmt: {:?}", stmt);
-                // println!("Environment: {:?}", self.environment.enclosing);
                 self.environment = self.environment.clone().enclosing.unwrap();
                 return Ok(Some(value));
             }
-            println!("Stmt: {:?}", stmt);
-            println!("Environment: {:?}", self.environment.enclosing);
         }
 
-        // println!("Env at end: {:?}", self.environment);
         //TODO: Think how to remove this unwrap
         self.environment = self.environment.clone().enclosing.unwrap();
 
