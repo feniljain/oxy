@@ -1,0 +1,13 @@
+- The first byte of any instruction is the opcode. Given a numeric opcode, we need to get to the right C code that implements that instruction’s semantics. This process is called decoding or dispatching the instruction.
+
+
+- http://gameprogrammingpatterns.com/singleton.html
+- Instruction Pointer = Program Counter = instruction address register = instruction counter = instruction sequencer = https://en.wikipedia.org/wiki/Program_counter
+- Very interesting usecases of static(different from other languages): https://www.c-programming-simple-steps.com/static-keyword-in-c.html
+- https://en.wikipedia.org/wiki/Threaded_code
+- https://en.wikipedia.org/wiki/Branch_table
+- https://eli.thegreenplace.net/2012/07/12/computed-goto-for-efficient-dispatch-tables
+- https://en.wikipedia.org/wiki/Branch_predictor
+- https://en.wikipedia.org/wiki/Heap_(data_structure)
+- https://en.wikipedia.org/wiki/Just-in-time_compilation
+- The main implementation of Lua used to be stack-based. For Lua 5.0, the implementers switched to a register instruction set and noted a speed improvement. The amount of improvement, naturally, depends heavily on the details of the language semantics, specific instruction set, and compiler sophistication, but that should get your attention.

@@ -1,0 +1,18 @@
+- Difference between #include<filename> and #include"filename": https://stackoverflow.com/questions/21593/what-is-the-difference-between-include-filename-and-include-filename
+    - #include<filename> to be usually used for importing standard library stuff
+    - #include"filename" to be usually used for importing programmer defined stuff
+
+- That %.*s in the format string is a neat feature. Usually, you set the output precision—the number of characters to show—by placing a number inside the format string. Using * instead lets you pass the precision as an argument. So that printf() call prints the first token.length characters of the string at token.start. We need to limit the length like that because the lexeme points into the original source string and doesn’t have a terminator at the end.
+
+- C string literals are constant and eternal.
+
+- “Trie” is one of the most confusing names in CS. Edward Fredkin yanked it out of the middle of the word “retrieval”, which means it should be pronounced like “tree”. But, uh, there is already a pretty important data structure pronounced “tree” which tries are a special case of, so unless you never speak of these things out loud, no one can tell which one you’re talking about. Thus, people these days often pronounce it like “try” to avoid the headache.
+
+- This is also how most regular expression engines in programming languages and text editors work under the hood. They take your regex string and convert it to a DFA, which they then use to match strings.
+
+
+
+- https://www.tutorialspoint.com/c_standard_library/c_function_fseek.htm
+- https://www.geeksforgeeks.org/ftell-c-example/
+- https://stackoverflow.com/questions/7899119/what-does-s-mean-in-printf
+- a[-1] in C: https://stackoverflow.com/questions/9861713/does-array-1-give-the-last-element-in-the-array

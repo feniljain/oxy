@@ -1,0 +1,4 @@
+- Early linkers for C treated only the first six characters of external identifiers as meaningful. Everything after that was ignored. If you’ve ever wondered why the C standard library is so enamored of abbreviation—looking at you, strncmp()—it turns out it wasn’t entirely because of the small screens (or teletypes!) of the day
+
+- One of the original names for a hash table was “scatter table” because it takes the entries and scatters them throughout the array. The word “hash” came from the idea that a hash function takes the input data, chops it up, and tosses it all together into a pile to come up with a single number from all of those bits.
+

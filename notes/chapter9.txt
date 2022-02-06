@@ -1,8 +1,8 @@
 - Simple explanation for which languages are turing complete: any programming language with some minimal level of expressiveness is powerful enough to compute any computable function.
 
-You can prove that by writing a simulator for a Turing machine in your language. Since Turing proved his machine can compute any computable function, by extension, that means your language can too. All you need to do is translate the function into a Turing machine, and then run that on your simulator.
+    You can prove that by writing a simulator for a Turing machine in your language. Since Turing proved his machine can compute any computable function, by extension, that means your language can too. All you need to do is translate the function into a Turing machine, and then run that on your simulator.
 
-If your language is expressive enough to do that, it’s considered Turing-complete.
+    If your language is expressive enough to do that, it’s considered Turing-complete.
 
 - An if statement lets you conditionally execute statements and the conditional operator(ternary operator) lets you conditionally execute expressions.
 

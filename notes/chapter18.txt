@@ -1,0 +1,7 @@
+- There is a third category next to statically typed and dynamically typed: unityped. In that paradigm, all variables have a single type, usually a machine register integer. Unityped languages aren’t common today, but some Forths and BCPL, the language that inspired C, worked like this.
+
+- If you’re familiar with a language in the ML family, structs and unions in C roughly mirror the difference between product and sum types, between tuples and algebraic data types.
+
+- You can pass macros to macros as parameters
+
+- Is a <= b always the same as !(a > b)? According to IEEE 754, all comparison operators return false when an operand is NaN. That means NaN <= 1 is false and NaN > 1 is also false.
