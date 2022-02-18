@@ -1,0 +1,3 @@
+- I designed Lox to be amenable to single-pass compilation to stack-based bytecode. But I didn’t have to tweak the language too much to fit in those restrictions. Most of its design should feel pretty natural.
+
+This is in large part because the history of languages is deeply tied to single-pass compilation and—to a lesser degree—stack-based architectures. Lox’s block scoping follows a tradition stretching back to BCPL. As programmers, our intuition of what’s “normal” in a language is informed even today by the hardware limitations of yesteryear.
