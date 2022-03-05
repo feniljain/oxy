@@ -21,7 +21,7 @@ void freeTable(Table *table) {
 }
 
 static Entry *findEntry(Entry *entries, int capacity, ObjString *key) {
-  int index = key->hash % capacity;
+  int index = key->hash & (capacity - 1);
   Entry *tombstone = NULL;
   while (true) {
     Entry *entry = &entries[index];
@@ -36,7 +36,7 @@ static Entry *findEntry(Entry *entries, int capacity, ObjString *key) {
       return entry;
     }
 
-    index = (index + 1) % capacity;
+    index = (index + 1) & (capacity - 1);
   }
 }
 
@@ -119,7 +119,7 @@ ObjString *tableFindString(Table *table, const char *chars, int length,
                            uint32_t hash) {
   if (table->count == 0)
     return NULL;
-  int index = hash % table->capacity;
+  int index = hash & (table->capacity - 1);
   while (true) {
     Entry *entry = &table->entries[index];
     if (entry->key == NULL) {
@@ -130,6 +130,23 @@ ObjString *tableFindString(Table *table, const char *chars, int length,
       return entry->key;
     }
 
-    index = (index + 1) % table->capacity;
+    index = (index + 1) & (table->capacity - 1);
+  }
+}
+
+void tableRemoveWhite(Table *table) {
+  for (int i = 0; i < table->capacity; i++) {
+    Entry *entry = &table->entries[i];
+    if (entry->key != NULL && !entry->key->obj.isMarked) {
+      tableDelete(table, entry->key);
+    }
+  }
+}
+
+void markTable(Table *table) {
+  for (int i = 0; i < table->capacity; i++) {
+    Entry *entry = &table->entries[i];
+    markObject((Obj *)entry->key);
+    markValue(entry->value);
   }
 }

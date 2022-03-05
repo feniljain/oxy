@@ -1,0 +1,12 @@
+- A conservative GC is a special kind of collector that considers any piece of memory to be a pointer if the value in there looks like it could be an address. This is in contrast to a precise GC—which is what we’ll implement—that knows exactly which words in memory are pointers and which store other kinds of values like numbers or strings
+
+- A tracing garbage collector is any algorithm that traces through the graph of object references. This is in contrast with reference counting, which has a different strategy for tracking the reachable objects.
+
+- More sophisticated collectors might run on a separate thread or be interleaved periodically during program execution—often at function call boundaries or when a backward jump occurs.
+
+- Java does not intern all strings, but it does intern string literals. It also provides an API to add strings to the string table. For many years, the capacity of that table was fixed, and strings added to it could never be removed. If users weren’t careful about their use of String.intern(), they could run out of memory and crash.
+
+Ruby had a similar problem for years where symbols—interned string-like values—were not garbage collected. Both eventually enabled the GC to collect these strings.
+
+- Difference between fields and properties: The compiler uses “property” instead of “field” here because, remember, Lox also lets you use dot syntax to access a method without calling it. “Property” is the general term we use to refer to any named entity you can access on an instance. Fields are the subset of properties that are backed by the instance’s state.
+
